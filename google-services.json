@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "374979006048",
+    "project_id": "vyapaar-c1323",
+    "storage_bucket": "vyapaar-c1323.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:374979006048:android:695d6b910b21b6e141fd05",
+        "android_client_info": {
+          "package_name": "com.vyapaarseva.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBpsXkJIP-pKjcRVV0k_V_WbGVpFgZ4U7E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
