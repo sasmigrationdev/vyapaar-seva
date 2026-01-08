@@ -20,6 +20,8 @@ import { useAlert } from "@/hooks/useAlert";
 import { LinearGradient } from "expo-linear-gradient";
 import { Text } from "@/components/ui/Text";
 import { Colors, BorderRadius, Shadows, Spacing } from "@/constants/theme";
+import { GoogleSignInButton } from "@/components/ui/GoogleSignInButton";
+import { IS_GOOGLE_CONFIGURED } from "@/hooks/auth/useGoogleAuth";
 
 type UserType = "employer" | "employee";
 
@@ -161,7 +163,7 @@ export default function SignupScreen() {
             </Text>
 
             <View style={styles.form}>
-              {/* User Type Selection */}
+              {/* User Type Selection - First */}
               <View style={styles.typeSection}>
                 <Text style={styles.typeSectionTitle}>I am...</Text>
                 <View style={styles.typeButtons}>
@@ -236,6 +238,22 @@ export default function SignupScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
+
+              {/* Google Sign-In Option */}
+              {IS_GOOGLE_CONFIGURED && (
+                <>
+                  <GoogleSignInButton
+                    onError={(err) => error("Google Sign-In Failed", err)}
+                    disabled={isLoading}
+                  />
+
+                  <View style={styles.dividerContainer}>
+                    <View style={styles.divider} />
+                    <Text style={styles.dividerText}>OR SIGN UP WITH EMAIL</Text>
+                    <View style={styles.divider} />
+                  </View>
+                </>
+              )}
 
               {/* Common fields */}
               <View style={styles.inputContainer}>
@@ -577,6 +595,22 @@ const styles = StyleSheet.create({
   linkText: {
     color: Colors.primary,
     fontSize: 14,
+    fontWeight: "600",
+  },
+  dividerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 20,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "rgba(0,0,0,0.06)",
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    fontSize: 11,
+    color: Colors.gray400,
     fontWeight: "600",
   },
 });

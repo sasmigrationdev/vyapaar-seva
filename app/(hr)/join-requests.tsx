@@ -121,13 +121,13 @@ export default function JoinRequestsScreen() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending':
-        return 'clock-outline';
+        return 'time-outline';
       case 'approved':
         return 'checkmark-circle';
       case 'rejected':
         return 'close-circle';
       case 'cancelled':
-        return 'ban';
+        return 'close-circle-outline';
       default:
         return 'help-circle-outline';
     }
@@ -299,7 +299,7 @@ export default function JoinRequestsScreen() {
     );
   }
 
-  if (error) {
+  if (fetchError) {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
@@ -318,7 +318,7 @@ export default function JoinRequestsScreen() {
           <MaterialCommunityIcons name="alert-circle-outline" size={64} color={Colors.error} />
           <Text style={styles.errorTitle}>Failed to Load</Text>
           <Text style={styles.errorText}>
-            {(error as any)?.message || 'Failed to load join requests'}
+            {fetchError?.message || 'Failed to load join requests'}
           </Text>
         </View>
       </View>
@@ -369,7 +369,9 @@ export default function JoinRequestsScreen() {
         {/* Requests List */}
         <View style={styles.requestsContainer}>
           {(requests as any)?.length > 0 ? (
-            (requests as any).map((item: any) => renderRequestCard({ item }))
+            (requests as any).map((item: any) => (
+              <View key={item.id}>{renderRequestCard({ item })}</View>
+            ))
           ) : (
             renderEmptyState()
           )}

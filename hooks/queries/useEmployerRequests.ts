@@ -33,6 +33,7 @@ export const usePendingJoinRequests = (
     queryKey: employerRequestKeys.pending(organizationId),
     queryFn: () => employerQueries.getPendingJoinRequests(organizationId),
     staleTime: 1000 * 60 * 2, // 2 minutes
+    enabled: !!organizationId,
     ...options,
   });
 };
@@ -52,6 +53,7 @@ export const useAllJoinRequests = (
     queryKey: employerRequestKeys.byOrg(organizationId, stableFilters),
     queryFn: () => employerQueries.getAllJoinRequests(organizationId, stableFilters),
     staleTime: 1000 * 60 * 3, // 3 minutes
+    enabled: !!organizationId,
     ...options,
   });
 };

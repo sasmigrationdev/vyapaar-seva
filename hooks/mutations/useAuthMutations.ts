@@ -152,3 +152,21 @@ export const useUpdatePassword = (
     ...options,
   });
 };
+
+/**
+ * Hook for signing in with Google
+ */
+export const useSignInWithGoogle = (
+  options?: UseMutationOptions<any, Error, { idToken: string }>
+) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ idToken }) => authMutations.signInWithGoogle(idToken),
+    onSuccess: () => {
+      // Invalidate all queries on sign in
+      queryClient.invalidateQueries();
+    },
+    ...options,
+  });
+};

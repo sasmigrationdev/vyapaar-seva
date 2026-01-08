@@ -25,7 +25,7 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
-  const { session, user, loading } = useAuth();
+  const { session, user, loading, needsRoleSelection } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -48,19 +48,23 @@ function RootLayoutNav() {
     const inAuthGroup = segments[0] === 'auth';
     const inEmployeeGroup = segments[0] === '(employee)';
     const inHRGroup = segments[0] === '(hr)';
+    const inRoleSelection = segments[1] === 'select-role';
 
     // Redirect logic
     if (!session && !inAuthGroup) {
       // Not signed in, redirect to welcome
       router.replace('/auth/welcome');
-    } else if (session && inAuthGroup) {
-      // Signed in but on auth screen, redirect based on role
+    } else if (session && needsRoleSelection && !inRoleSelection) {
+      // User is authenticated but needs to select a role (new Google user)
+      router.replace('/auth/select-role');
+    } else if (session && !needsRoleSelection && inAuthGroup && !inRoleSelection) {
+      // Signed in with profile but on auth screen (not role selection), redirect based on role
       if (user?.role === 'hr' || user?.role === 'admin') {
         router.replace('/(hr)');
       } else {
         router.replace('/(employee)');
       }
-    } else if (session && user) {
+    } else if (session && user && !needsRoleSelection) {
       // Ensure user is in correct role group
       const isHR = user.role === 'hr' || user.role === 'admin';
       if (isHR && inEmployeeGroup) {
@@ -69,7 +73,7 @@ function RootLayoutNav() {
         router.replace('/(employee)');
       }
     }
-  }, [session, user, segments, loading]);
+  }, [session, user, segments, loading, needsRoleSelection]);
 
   if (loading) {
     return (

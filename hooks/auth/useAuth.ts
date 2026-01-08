@@ -9,6 +9,7 @@ export const useAuth = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsRoleSelection, setNeedsRoleSelection] = useState(false);
 
   useEffect(() => {
     // Get initial session
@@ -82,11 +83,24 @@ export const useAuth = () => {
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
-      setUser(data);
+      if (error) {
+        // PGRST116 means no rows found - user doesn't have a profile yet
+        // This happens when a user signs in with Google for the first time
+        if (error.code === 'PGRST116') {
+          console.log('User profile not found - needs role selection');
+          setNeedsRoleSelection(true);
+          setUser(null);
+        } else {
+          throw error;
+        }
+      } else {
+        setUser(data);
+        setNeedsRoleSelection(false);
+      }
     } catch (error) {
       console.error('Error fetching user profile:', error);
       setUser(null);
+      setNeedsRoleSelection(false);
     } finally {
       setLoading(false);
     }
@@ -100,5 +114,6 @@ export const useAuth = () => {
     isEmployee: user?.role === 'employee',
     isHR: user?.role === 'hr' || user?.role === 'admin',
     isAdmin: user?.role === 'admin',
+    needsRoleSelection,
   };
 };

@@ -18,6 +18,8 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { Link, router } from "expo-router";
 import { useSignIn } from "@/hooks/mutations/useAuthMutations";
 import { Colors, BorderRadius, Shadows, Spacing } from "@/constants/theme";
+import { GoogleSignInButton } from "@/components/ui/GoogleSignInButton";
+import { IS_GOOGLE_CONFIGURED } from "@/hooks/auth/useGoogleAuth";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -152,11 +154,22 @@ export default function LoginScreen() {
                 </TouchableOpacity>
               </Link>
 
-              <View style={styles.dividerContainer}>
-                <View style={styles.divider} />
-                <Text style={styles.dividerText}>OR</Text>
-                <View style={styles.divider} />
-              </View>
+              {IS_GOOGLE_CONFIGURED && (
+                <>
+                  <View style={styles.dividerContainer}>
+                    <View style={styles.divider} />
+                    <Text style={styles.dividerText}>OR</Text>
+                    <View style={styles.divider} />
+                  </View>
+
+                  <GoogleSignInButton
+                    onError={(err) => error("Google Sign-In Failed", err)}
+                    disabled={signInMutation.isPending}
+                  />
+
+                  <View style={styles.spacer} />
+                </>
+              )}
 
               <Link href="/auth/signup" asChild>
                 <TouchableOpacity style={styles.secondaryButton}>
@@ -324,5 +337,8 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontSize: 16,
     fontWeight: "600",
+  },
+  spacer: {
+    height: 12,
   },
 });

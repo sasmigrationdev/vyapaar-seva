@@ -187,4 +187,38 @@ export const authMutations = {
     });
     if (error) throw error;
   },
+
+  /**
+   * Sign in with Google OAuth
+   * Uses the ID token from Google to authenticate with Supabase
+   */
+  signInWithGoogle: async (idToken: string) => {
+    const { data, error } = await supabase.auth.signInWithIdToken({
+      provider: 'google',
+      token: idToken,
+    });
+
+    if (error) {
+      console.error('===== GOOGLE SIGN IN ERROR =====');
+      console.error('Error Message:', error.message);
+      console.error('Full Error:', JSON.stringify(error, null, 2));
+      console.error('================================');
+      throw error;
+    }
+
+    // Register device info for this session
+    if (data.session && data.user) {
+      try {
+        const sessionId = extractSessionIdFromToken(data.session.access_token);
+        if (sessionId) {
+          await deviceMutations.registerDeviceInfo(sessionId, data.user.id);
+        }
+      } catch (deviceError) {
+        // Log but don't fail login
+        console.error('Failed to register device info:', deviceError);
+      }
+    }
+
+    return data;
+  },
 };
