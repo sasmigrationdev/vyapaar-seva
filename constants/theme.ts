@@ -1,12 +1,12 @@
 /**
- * VYAPAAR SEVA Design System
+ * VYAPAAR SEWA Design System
  * Indian Flag inspired color palette with professional, clean aesthetics
  * Colors: Saffron, White, Green, Navy Blue (Ashoka Chakra)
  */
 
 import { Platform } from "react-native";
 
-// Indian Flag Color Palette - VYAPAAR SEVA
+// Indian Flag Color Palette - VYAPAAR SEWA
 export const Colors = {
   // Primary - Saffron/Orange (Kesari) - Main brand color
   primary: "#FF9933",

@@ -42,7 +42,7 @@ const translations = {
     slides: [
       {
         id: "1",
-        title: "VYAPAAR SEVA",
+        title: "VYAPAAR SEWA",
         subtitle: "Your Complete Business Partner",
         description:
           "Streamline your business operations with our all-in-one management solution.",

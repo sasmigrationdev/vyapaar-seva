@@ -62,7 +62,7 @@ export default function LoginScreen() {
             style={styles.logo}
             resizeMode="contain"
           />
-          <Text style={styles.appName}>VYAPAAR SEVA</Text>
+          <Text style={styles.appName}>VYAPAAR SEWA</Text>
           <Text style={styles.tagline}>Attendance & Salary Management</Text>
         </View>
       </LinearGradient>

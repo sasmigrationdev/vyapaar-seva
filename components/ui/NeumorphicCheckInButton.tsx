@@ -46,15 +46,10 @@ export function NeumorphicCheckInButton({
     }).start();
   };
 
-  // Press animation - button sinks
-  const translateY = animation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 3],
-  });
-
+  // Press animation - button shrinks in center
   const scale = animation.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, 0.98],
+    outputRange: [1, 0.96],
   });
 
   // Shadow decreases when pressed
@@ -94,7 +89,7 @@ export function NeumorphicCheckInButton({
               width: size,
               height: size,
               borderRadius: size / 2,
-              transform: [{ translateY }, { scale }],
+              transform: [{ scale }],
               shadowOpacity,
             },
             disabled && styles.disabledOuter,
@@ -150,18 +145,6 @@ const styles = StyleSheet.create({
   dropShadow: {
     position: 'absolute',
     backgroundColor: '#D4D7DC',
-    top: 25,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#9CA3AF',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
   },
   outerCircle: {
     backgroundColor: '#E8EAED',
@@ -171,10 +154,10 @@ const styles = StyleSheet.create({
     borderColor: '#D4D7DC',
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowRadius: 8,
-        shadowOpacity: 0.2,
+        shadowColor: '#888',
+        shadowOffset: { width: 0, height: 0 },
+        shadowRadius: 10,
+        shadowOpacity: 0.25,
       },
       android: {
         elevation: 6,

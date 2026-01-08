@@ -1,4 +1,4 @@
-# Vyapaar Seva - UI/UX Improvement Plan
+# Vyapaar Sewa - UI/UX Improvement Plan
 ## For $10M-Level Professional Quality
 
 ---
@@ -474,4 +474,4 @@ tabBar: {
 
 ---
 
-*This plan transforms Vyapaar Seva from a functional app into a $10M-quality product that Indian businesses will be proud to use.*
+*This plan transforms Vyapaar Sewa from a functional app into a $10M-quality product that Indian businesses will be proud to use.*

@@ -67,7 +67,7 @@ export default function ForgotPasswordScreen() {
             style={styles.logo}
             resizeMode="contain"
           />
-          <Text style={styles.appName}>VYAPAAR SEVA</Text>
+          <Text style={styles.appName}>VYAPAAR SEWA</Text>
         </View>
       </LinearGradient>
 
