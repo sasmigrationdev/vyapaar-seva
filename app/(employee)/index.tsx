@@ -2,6 +2,8 @@ import AddOvertimeModal from "@/components/attendance/AddOvertimeModal";
 import BreakRequestModal from "@/components/attendance/BreakRequestModal";
 import WiFiVerificationModal from "@/components/attendance/WiFiVerificationModal";
 import SalaryProgressCard from "@/components/salary/SalaryProgressCard";
+import { DepthButton } from "@/components/ui/DepthButton";
+import { NeumorphicCheckInButton } from "@/components/ui/NeumorphicCheckInButton";
 import { Text } from "@/components/ui/Text";
 import {
   BorderRadius,
@@ -748,65 +750,45 @@ export default function EmployeeDashboard() {
                     </View>
                   )}
 
-                  {canCheckIn && (
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={handleCheckIn}
-                      disabled={checkInMutation.isPending}
-                      style={styles.primaryButton}
-                    >
-                      {checkInMutation.isPending ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <>
-                          <Ionicons
-                            name="checkmark-circle"
-                            size={16}
-                            color="#FFFFFF"
-                          />
-                          <Text style={styles.primaryButtonText}>
-                            Check In Now
-                          </Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
+                  {/* Neumorphic Check-In/Check-Out Button */}
+                  {(canCheckIn || isCheckedIn) && !activeBreak && !upcomingBreak && (
+                    <View style={styles.neumorphicButtonContainer}>
+                      <NeumorphicCheckInButton
+                        onPress={isCheckedIn ? handleCheckOut : handleCheckIn}
+                        disabled={
+                          checkInMutation.isPending ||
+                          checkOutMutation.isPending
+                        }
+                        loading={
+                          checkInMutation.isPending ||
+                          checkOutMutation.isPending
+                        }
+                        isCheckedIn={!!isCheckedIn}
+                        size={140}
+                      />
+                    </View>
+                  )}
+
+                  {/* Show disabled checkout when on break */}
+                  {isCheckedIn && (activeBreak || upcomingBreak) && (
+                    <View style={styles.breakBlockedContainer}>
+                      <View style={styles.breakBlockedIcon}>
+                        <Ionicons
+                          name="lock-closed"
+                          size={24}
+                          color={Colors.gray400}
+                        />
+                      </View>
+                      <Text style={styles.breakBlockedText}>
+                        {activeBreak
+                          ? "Check-out blocked during break"
+                          : "Check-out blocked - break scheduled"}
+                      </Text>
+                    </View>
                   )}
 
                   {isCheckedIn && (
                     <>
-                      <TouchableOpacity
-                        activeOpacity={0.7}
-                        onPress={handleCheckOut}
-                        disabled={
-                          checkOutMutation.isPending ||
-                          !!activeBreak ||
-                          !!upcomingBreak
-                        }
-                        style={[
-                          styles.checkOutButton,
-                          (activeBreak || upcomingBreak) &&
-                            styles.checkOutButtonDisabled,
-                        ]}
-                      >
-                        {checkOutMutation.isPending ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <>
-                            <Ionicons
-                              name="exit-outline"
-                              size={16}
-                              color="#FFFFFF"
-                            />
-                            <Text style={styles.checkOutButtonText}>
-                              {activeBreak
-                                ? "On Break - Cannot Check Out"
-                                : upcomingBreak
-                                ? "Break Approved - Cannot Check Out"
-                                : "Check Out"}
-                            </Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
 
                       {upcomingBreak ? (
                         <View style={styles.upcomingBreakCard}>
@@ -967,30 +949,22 @@ export default function EmployeeDashboard() {
 
                           {/* End Break Button */}
                           <View style={styles.breakActionContainer}>
-                            <TouchableOpacity
-                              activeOpacity={0.7}
+                            <DepthButton
                               onPress={handleEndBreak}
                               disabled={endBreakMutation.isPending}
-                              style={styles.endBreakButton}
-                            >
-                              {endBreakMutation.isPending ? (
-                                <ActivityIndicator
-                                  size="small"
+                              loading={endBreakMutation.isPending}
+                              variant="success"
+                              size="md"
+                              icon={
+                                <MaterialCommunityIcons
+                                  name="coffee-to-go"
+                                  size={20}
                                   color="#FFFFFF"
                                 />
-                              ) : (
-                                <>
-                                  <MaterialCommunityIcons
-                                    name="coffee-to-go"
-                                    size={20}
-                                    color="#FFFFFF"
-                                  />
-                                  <Text style={styles.endBreakButtonText}>
-                                    End Break Now
-                                  </Text>
-                                </>
-                              )}
-                            </TouchableOpacity>
+                              }
+                            >
+                              End Break Now
+                            </DepthButton>
                           </View>
 
                           {/* Footer Message */}
@@ -1724,6 +1698,39 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontStyle: "italic",
     textAlign: "center",
+  },
+  // Neumorphic Button Styles
+  neumorphicButtonContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing["2xl"],
+    paddingHorizontal: Spacing["xl"],
+    marginVertical: Spacing["sm"],
+  },
+  breakBlockedContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing["sm"],
+    paddingVertical: Spacing["lg"],
+    paddingHorizontal: Spacing["xl"],
+    backgroundColor: Colors.gray100,
+    borderRadius: BorderRadius["xl"],
+    marginVertical: Spacing["sm"],
+  },
+  breakBlockedIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.gray200,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  breakBlockedText: {
+    flex: 1,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.medium,
+    color: Colors.gray500,
   },
   // Info Row Styles (for compact stats)
   infoRow: {
