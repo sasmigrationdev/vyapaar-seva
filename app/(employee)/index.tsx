@@ -720,14 +720,7 @@ export default function EmployeeDashboard() {
                         </>
                       )}
                     </>
-                  ) : (
-                    <View style={styles.emptyStateContainer}>
-                      <Feather name="calendar" size={40} color={Colors.gray400} />
-                      <Text style={styles.emptyStateText}>
-                        No attendance recorded today
-                      </Text>
-                    </View>
-                  )}
+                  ) : null}
 
                   {!todayAttendance && !isTodayWorking && (
                     <View style={styles.nonWorkingDayContainer}>

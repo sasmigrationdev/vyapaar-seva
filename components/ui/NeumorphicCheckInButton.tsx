@@ -60,7 +60,7 @@ export function NeumorphicCheckInButton({
   // Shadow decreases when pressed
   const shadowOpacity = animation.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.25, 0.1],
+    outputRange: [0.3, 0.12],
   });
   const size = 240;
   const buttonColor = isCheckedIn ? '#EF4444' : Colors.primary;
@@ -74,9 +74,9 @@ export function NeumorphicCheckInButton({
         style={[
           styles.dropShadow,
           {
-            width: size,
-            height: size,
-            borderRadius: size / 2,
+            width: size + 8,
+            height: size + 8,
+            borderRadius: (size + 8) / 2,
           },
         ]}
       />
@@ -105,9 +105,9 @@ export function NeumorphicCheckInButton({
             style={[
               styles.innerCircle,
               {
-                width: size - 16,
-                height: size - 16,
-                borderRadius: (size - 16) / 2,
+                width: size - 24,
+                height: size - 24,
+                borderRadius: (size - 24) / 2,
               },
               disabled && styles.disabledInner,
             ]}
@@ -150,16 +150,16 @@ const styles = StyleSheet.create({
   dropShadow: {
     position: 'absolute',
     backgroundColor: '#D4D7DC',
-    top: 28,
+    top: 25,
     ...Platform.select({
       ios: {
         shadowColor: '#9CA3AF',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
       },
       android: {
-        elevation: 6,
+        elevation: 3,
       },
     }),
   },
@@ -172,12 +172,12 @@ const styles = StyleSheet.create({
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowRadius: 6,
-        shadowOpacity: 0.15,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 8,
+        shadowOpacity: 0.2,
       },
       android: {
-        elevation: 4,
+        elevation: 6,
       },
     }),
   },
