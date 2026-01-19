@@ -501,6 +501,31 @@ export default function HRProfileScreen() {
                 color={Colors.gray300}
               />
             </TouchableOpacity>
+
+            <View style={styles.divider} />
+
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => router.push("/(hr)/breaks")}
+              activeOpacity={0.6}
+            >
+              <MaterialCommunityIcons
+                name="coffee"
+                size={22}
+                color={Colors.primary}
+              />
+              <View style={styles.actionContent}>
+                <Text style={styles.actionLabel}>Break Management</Text>
+                <Text style={styles.actionDescription}>
+                  Add and manage employee breaks
+                </Text>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={Colors.gray300}
+              />
+            </TouchableOpacity>
           </View>
         </View>
 

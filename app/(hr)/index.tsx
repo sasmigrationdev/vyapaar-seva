@@ -192,6 +192,14 @@ export default function HRDashboard() {
       color: Colors.success,
       onPress: () => router.push("/(hr)/financial"),
     },
+    {
+      id: "breaks",
+      label: "Breaks",
+      description: "Manage breaks",
+      icon: "coffee" as const,
+      color: "#0891b2",
+      onPress: () => router.push("/(hr)/breaks"),
+    },
   ];
 
   return (
