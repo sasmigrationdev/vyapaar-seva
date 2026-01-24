@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, StatusBar, RefreshControl } from 'react-native';
+import { useState, useMemo } from 'react';
+import { View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, StatusBar, RefreshControl, Modal, ScrollView } from 'react-native';
 import { useAlert } from '@/hooks/useAlert';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { Text } from '@/components/ui/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/hooks/auth/useAuth';
-import { useAttendanceByDateRange } from '@/hooks/queries/useAttendance';
+import { useAttendanceByDateRange, useAllAttendanceForUser, useAvailableAttendanceYears } from '@/hooks/queries/useAttendance';
 import { useMyOvertimeRequests } from '@/hooks/queries/useOvertimeRequests';
 import { formatDate, formatTime, getFirstDayOfMonth, getLastDayOfMonth } from '@/lib/utils/date.utils';
 import { formatHours, getAttendanceStatus } from '@/lib/utils/attendance.utils';
@@ -14,26 +14,90 @@ import { AttendanceRecord } from '@/lib/types';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '@/constants/theme';
 import AddOvertimeModal from '@/components/attendance/AddOvertimeModal';
 
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
 export default function AttendanceScreen() {
   const { user } = useAuth();
   const { success, error, info } = useAlert();
   const userId = user?.id || '';
 
-  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth();
+
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>(currentYear);
+  const [selectedMonth, setSelectedMonth] = useState<number>(currentMonth);
+  const [showYearPicker, setShowYearPicker] = useState(false);
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [showOvertimeModal, setShowOvertimeModal] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
-  const startDate = getFirstDayOfMonth(selectedMonth).toISOString().split('T')[0];
-  const endDate = getLastDayOfMonth(selectedMonth).toISOString().split('T')[0];
 
-  const { data: records, isLoading, refetch } = useAttendanceByDateRange(userId, startDate, endDate);
+  const isAllTime = selectedYear === 'all';
 
-  // Fetch overtime requests for the selected month
-  const { data: overtimeRequests, refetch: refetchOvertimeRequests } = useMyOvertimeRequests(userId, {
+  // Calculate date range for selected month/year
+  const { startDate, endDate } = useMemo(() => {
+    if (isAllTime) {
+      return { startDate: '', endDate: '' };
+    }
+    const start = getFirstDayOfMonth(new Date(selectedYear as number, selectedMonth)).toISOString().split('T')[0];
+    const end = getLastDayOfMonth(new Date(selectedYear as number, selectedMonth)).toISOString().split('T')[0];
+    return { startDate: start, endDate: end };
+  }, [selectedYear, selectedMonth, isAllTime]);
+
+  // Fetch available years
+  const { data: availableYears } = useAvailableAttendanceYears(userId);
+
+  // Fetch records based on filter
+  const { data: monthlyRecords, isLoading: isLoadingMonthly, refetch: refetchMonthly } = useAttendanceByDateRange(
+    userId,
+    startDate,
+    endDate,
+    { enabled: !isAllTime && !!startDate && !!endDate }
+  );
+
+  const { data: allRecords, isLoading: isLoadingAll, refetch: refetchAll } = useAllAttendanceForUser(
+    userId,
+    { enabled: isAllTime }
+  );
+
+  const records = isAllTime ? allRecords : monthlyRecords;
+  const isLoading = isAllTime ? isLoadingAll : isLoadingMonthly;
+  const refetch = isAllTime ? refetchAll : refetchMonthly;
+
+  // Fetch overtime requests
+  const { data: overtimeRequests, refetch: refetchOvertimeRequests } = useMyOvertimeRequests(userId, isAllTime ? {} : {
     startDate,
     endDate,
   });
+
+  // Generate year options (from available years or last 5 years)
+  const yearOptions = useMemo(() => {
+    const years: (number | 'all')[] = ['all'];
+    if (availableYears && availableYears.length > 0) {
+      years.push(...availableYears);
+    } else {
+      // Fallback: show last 5 years including current
+      for (let i = 0; i < 5; i++) {
+        years.push(currentYear - i);
+      }
+    }
+    return years;
+  }, [availableYears, currentYear]);
+
+  // Get available months for selected year
+  const availableMonths = useMemo(() => {
+    if (isAllTime) return [];
+    if (selectedYear === currentYear) {
+      // For current year, only show months up to current month
+      return MONTHS.slice(0, currentMonth + 1);
+    }
+    return MONTHS;
+  }, [selectedYear, currentYear, currentMonth, isAllTime]);
 
   // Helper to get overtime request for a specific attendance record
   const getOvertimeRequest = (attendanceRecordId: string) => {
@@ -55,13 +119,17 @@ export default function AttendanceScreen() {
       return;
     }
 
+    if (isAllTime) {
+      info('Select a Month', 'Please select a specific month to download the report');
+      return;
+    }
+
     try {
       setDownloading(true);
 
-      // Get the current day of the selected month
       const today = new Date();
-      const month = selectedMonth.getMonth() + 1;
-      const year = selectedMonth.getFullYear();
+      const month = selectedMonth + 1;
+      const year = selectedYear as number;
 
       // If it's the current month, use today's date, otherwise use the last day of the month
       let endDay: number | undefined;
@@ -83,6 +151,21 @@ export default function AttendanceScreen() {
       setDownloading(false);
     }
   };
+
+  const handleYearSelect = (year: number | 'all') => {
+    setSelectedYear(year);
+    if (year !== 'all' && year === currentYear && selectedMonth > currentMonth) {
+      setSelectedMonth(currentMonth);
+    }
+    setShowYearPicker(false);
+  };
+
+  const handleMonthSelect = (monthIndex: number) => {
+    setSelectedMonth(monthIndex);
+    setShowMonthPicker(false);
+  };
+
+  const isCurrentMonthSelected = !isAllTime && selectedYear === currentYear && selectedMonth === currentMonth;
 
   const renderAttendanceItem = ({ item }: { item: AttendanceRecord }) => {
     const status = getAttendanceStatus(item);
@@ -236,21 +319,6 @@ export default function AttendanceScreen() {
     );
   };
 
-  const previousMonth = () => {
-    setSelectedMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1));
-  };
-
-  const nextMonth = () => {
-    const now = new Date();
-    if (selectedMonth.getMonth() < now.getMonth() || selectedMonth.getFullYear() < now.getFullYear()) {
-      setSelectedMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1));
-    }
-  };
-
-  const isCurrentMonth =
-    selectedMonth.getMonth() === new Date().getMonth() &&
-    selectedMonth.getFullYear() === new Date().getFullYear();
-
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
@@ -261,79 +329,171 @@ export default function AttendanceScreen() {
         end={{ x: 1, y: 1 }}
         style={styles.heroSection}
       >
-        <View style={styles.monthSelector}>
+        <View style={styles.filterContainer}>
+          {/* Year Dropdown */}
           <TouchableOpacity
-            onPress={previousMonth}
-            style={styles.monthButton}
+            style={styles.dropdownButton}
+            onPress={() => setShowYearPicker(true)}
             activeOpacity={0.7}
           >
-            <Ionicons name="chevron-back" size={24} color={Colors.textInverse} />
-          </TouchableOpacity>
-
-          <View style={styles.monthTextContainer}>
-            <MaterialCommunityIcons name="calendar-month" size={20} color={Colors.textInverse} />
-            <Text style={styles.monthText}>
-              {selectedMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            <MaterialCommunityIcons name="calendar" size={18} color={Colors.textInverse} />
+            <Text style={styles.dropdownText}>
+              {isAllTime ? 'All Time' : selectedYear}
             </Text>
-          </View>
-
-          <TouchableOpacity
-            onPress={nextMonth}
-            style={[styles.monthButton, isCurrentMonth && styles.monthButtonDisabled]}
-            disabled={isCurrentMonth}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name="chevron-forward"
-              size={24}
-              color={isCurrentMonth ? 'rgba(255,255,255,0.4)' : Colors.textInverse}
-            />
+            <Ionicons name="chevron-down" size={16} color={Colors.textInverse} />
           </TouchableOpacity>
+
+          {/* Month Dropdown - hidden when "All Time" is selected */}
+          {!isAllTime && (
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => setShowMonthPicker(true)}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="calendar-month" size={18} color={Colors.textInverse} />
+              <Text style={styles.dropdownText}>
+                {MONTHS[selectedMonth]}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color={Colors.textInverse} />
+            </TouchableOpacity>
+          )}
         </View>
       </LinearGradient>
 
-      {/* Download Report Section */}
-      <View style={styles.modernSection}>
-        <View style={styles.modernSectionHeader}>
-          <Text style={styles.modernSectionTitle}>Monthly Report</Text>
-        </View>
+      {/* Year Picker Modal */}
+      <Modal
+        visible={showYearPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowYearPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowYearPicker(false)}
+        >
+          <View style={styles.pickerContainer}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>Select Year</Text>
+              <TouchableOpacity onPress={() => setShowYearPicker(false)}>
+                <Ionicons name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.pickerList} showsVerticalScrollIndicator={false}>
+              {yearOptions.map((year) => (
+                <TouchableOpacity
+                  key={year}
+                  style={[
+                    styles.pickerItem,
+                    selectedYear === year && styles.pickerItemSelected
+                  ]}
+                  onPress={() => handleYearSelect(year)}
+                >
+                  <Text style={[
+                    styles.pickerItemText,
+                    selectedYear === year && styles.pickerItemTextSelected
+                  ]}>
+                    {year === 'all' ? 'All Time' : year}
+                  </Text>
+                  {selectedYear === year && (
+                    <Ionicons name="checkmark" size={20} color={Colors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
-        <View style={styles.groupedList}>
-          <View style={styles.reportHeader}>
-            <View style={styles.reportHeaderLeft}>
-              <Ionicons name="document-text-outline" size={20} color={Colors.primary} />
-              <Text style={styles.reportTitle}>Attendance Report</Text>
+      {/* Month Picker Modal */}
+      <Modal
+        visible={showMonthPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMonthPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMonthPicker(false)}
+        >
+          <View style={styles.pickerContainer}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>Select Month</Text>
+              <TouchableOpacity onPress={() => setShowMonthPicker(false)}>
+                <Ionicons name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.pickerList} showsVerticalScrollIndicator={false}>
+              {availableMonths.map((month, index) => (
+                <TouchableOpacity
+                  key={month}
+                  style={[
+                    styles.pickerItem,
+                    selectedMonth === index && styles.pickerItemSelected
+                  ]}
+                  onPress={() => handleMonthSelect(index)}
+                >
+                  <Text style={[
+                    styles.pickerItemText,
+                    selectedMonth === index && styles.pickerItemTextSelected
+                  ]}>
+                    {month}
+                  </Text>
+                  {selectedMonth === index && (
+                    <Ionicons name="checkmark" size={20} color={Colors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Download Report Section */}
+      {!isAllTime && (
+        <View style={styles.modernSection}>
+          <View style={styles.modernSectionHeader}>
+            <Text style={styles.modernSectionTitle}>Monthly Report</Text>
+          </View>
+
+          <View style={styles.groupedList}>
+            <View style={styles.reportHeader}>
+              <View style={styles.reportHeaderLeft}>
+                <Ionicons name="document-text-outline" size={20} color={Colors.primary} />
+                <Text style={styles.reportTitle}>Attendance Report</Text>
+              </View>
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.reportContent}>
+              <Text style={styles.reportHint}>
+                {isCurrentMonthSelected
+                  ? `Download attendance report for ${MONTHS[selectedMonth]} up to today`
+                  : 'Download complete attendance report with salary details'
+                }
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.downloadButton,
+                  (!records || records.length === 0) && styles.downloadButtonDisabled
+                ]}
+                onPress={handleDownloadReport}
+                disabled={!records || records.length === 0 || downloading}
+                activeOpacity={0.7}
+              >
+                {downloading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="download-outline" size={20} color="#FFFFFF" />
+                    <Text style={styles.downloadButtonText}>Download PDF Report</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
-          <View style={styles.divider} />
-          <View style={styles.reportContent}>
-            <Text style={styles.reportHint}>
-              {isCurrentMonth 
-                ? `Download attendance report for ${selectedMonth.toLocaleDateString('en-US', { month: 'long' })} up to today`
-                : 'Download complete attendance report with salary details'
-              }
-            </Text>
-            <TouchableOpacity
-              style={[
-                styles.downloadButton,
-                (!records || records.length === 0) && styles.downloadButtonDisabled
-              ]}
-              onPress={handleDownloadReport}
-              disabled={!records || records.length === 0 || downloading}
-              activeOpacity={0.7}
-            >
-              {downloading ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <Ionicons name="download-outline" size={20} color="#FFFFFF" />
-                  <Text style={styles.downloadButtonText}>Download PDF Report</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
         </View>
-      </View>
+      )}
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
@@ -358,7 +518,12 @@ export default function AttendanceScreen() {
       ) : (
         <View style={styles.emptyContainer}>
           <Feather name="calendar" size={64} color="#CBD5E1" />
-          <Text style={styles.emptyText}>No attendance records for this month</Text>
+          <Text style={styles.emptyText}>
+            {isAllTime
+              ? 'No attendance records found'
+              : `No attendance records for ${MONTHS[selectedMonth]} ${selectedYear}`
+            }
+          </Text>
           <Text style={styles.emptySubtext}>Records will appear here once you check in</Text>
         </View>
       )}
@@ -390,32 +555,75 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: BorderRadius['3xl'],
     borderBottomRightRadius: BorderRadius['3xl'],
   },
-  monthSelector: {
+  filterContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: Spacing['md'],
+  },
+  dropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: Spacing['lg'],
+    paddingVertical: Spacing['sm'],
+    borderRadius: BorderRadius.xl,
+    gap: Spacing['sm'],
+  },
+  dropdownText: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.textInverse,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing['2xl'],
+  },
+  pickerContainer: {
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius['2xl'],
+    width: '100%',
+    maxWidth: 320,
+    maxHeight: '70%',
+    overflow: 'hidden',
+  },
+  pickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: Spacing['lg'],
+    paddingHorizontal: Spacing['lg'],
+    paddingVertical: Spacing['md'],
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
-  monthButton: {
-    width: 44,
-    height: 44,
-    borderRadius: BorderRadius.xl,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  monthButtonDisabled: {
-    opacity: 0.5,
-  },
-  monthTextContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing['sm'],
-  },
-  monthText: {
-    fontSize: Typography.fontSize.xl,
+  pickerTitle: {
+    fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.textInverse,
+    color: Colors.text,
+  },
+  pickerList: {
+    paddingVertical: Spacing['sm'],
+  },
+  pickerItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing['lg'],
+    paddingVertical: Spacing['md'],
+  },
+  pickerItemSelected: {
+    backgroundColor: Colors.primaryLight + '20',
+  },
+  pickerItemText: {
+    fontSize: Typography.fontSize.base,
+    color: Colors.text,
+  },
+  pickerItemTextSelected: {
+    color: Colors.primary,
+    fontWeight: Typography.fontWeight.semibold,
   },
   modernSection: {
     paddingHorizontal: Spacing['2xl'],

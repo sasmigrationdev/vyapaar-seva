@@ -44,6 +44,42 @@ export const attendanceQueries = {
   },
 
   /**
+   * Fetch all attendance records for a user (no date filter)
+   */
+  getAllAttendanceForUser: async (userId: string): Promise<AttendanceRecord[]> => {
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  },
+
+  /**
+   * Get available years for a user's attendance records
+   */
+  getAvailableYears: async (userId: string): Promise<number[]> => {
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .select('date')
+      .eq('user_id', userId)
+      .order('date', { ascending: false });
+
+    if (error) throw error;
+
+    // Extract unique years from dates
+    const years = new Set<number>();
+    (data || []).forEach(record => {
+      const year = new Date(record.date).getFullYear();
+      years.add(year);
+    });
+
+    return Array.from(years).sort((a, b) => b - a); // Sort descending
+  },
+
+  /**
    * Fetch monthly attendance summary
    */
   getMonthlyAttendanceSummary: async (userId: string, month: number, year: number) => {

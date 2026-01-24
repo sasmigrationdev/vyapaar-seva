@@ -10,6 +10,8 @@ export const attendanceKeys = {
   today: (userId: string) => [...attendanceKeys.all, 'today', userId] as const,
   byDateRange: (userId: string, startDate: string, endDate: string) =>
     [...attendanceKeys.all, 'range', userId, startDate, endDate] as const,
+  allForUser: (userId: string) => [...attendanceKeys.all, 'all-records', userId] as const,
+  availableYears: (userId: string) => [...attendanceKeys.all, 'years', userId] as const,
   monthlySummary: (userId: string, month: number, year: number) =>
     [...attendanceKeys.all, 'monthly', userId, month, year] as const,
   currentWeek: (userId: string) => [...attendanceKeys.all, 'current-week', userId] as const,
@@ -50,6 +52,36 @@ export const useAttendanceByDateRange = (
     queryKey: attendanceKeys.byDateRange(userId, startDate, endDate),
     queryFn: () => attendanceQueries.getAttendanceByDateRange(userId, startDate, endDate),
     staleTime: 1000 * 60 * 5, // 5 minutes
+    ...options,
+  });
+};
+
+/**
+ * Hook to fetch all attendance records for a user (no date filter)
+ */
+export const useAllAttendanceForUser = (
+  userId: string,
+  options?: Omit<UseQueryOptions<AttendanceRecord[]>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: attendanceKeys.allForUser(userId),
+    queryFn: () => attendanceQueries.getAllAttendanceForUser(userId),
+    staleTime: 1000 * 60 * 5,
+    ...options,
+  });
+};
+
+/**
+ * Hook to fetch available years for a user's attendance records
+ */
+export const useAvailableAttendanceYears = (
+  userId: string,
+  options?: Omit<UseQueryOptions<number[]>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: attendanceKeys.availableYears(userId),
+    queryFn: () => attendanceQueries.getAvailableYears(userId),
+    staleTime: 1000 * 60 * 10, // 10 minutes - years don't change often
     ...options,
   });
 };
