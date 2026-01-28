@@ -219,4 +219,19 @@ export const userMutations = {
     if (error) throw error;
     return data;
   },
+
+  /**
+   * Update auto check-in setting
+   */
+  updateAutoCheckinSetting: async (userId: string, enabled: boolean) => {
+    const { data, error } = await supabase
+      .from('users')
+      .update({ auto_checkin_enabled: enabled })
+      .eq('id', userId)
+      .select('auto_checkin_enabled')
+      .single();
+
+    if (error) throw error;
+    return data?.auto_checkin_enabled ?? false;
+  },
 };

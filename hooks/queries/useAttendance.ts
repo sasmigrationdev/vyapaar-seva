@@ -1,6 +1,6 @@
 import { useQuery, UseQueryOptions } from '@tanstack/react-query';
 import { attendanceQueries } from '@/lib/api/queries/attendance.queries';
-import { AttendanceRecord, AttendanceWithUser } from '@/lib/types';
+import { AttendanceRecord, AttendanceWithUser, YearFilter, MonthFilter } from '@/lib/types';
 
 /**
  * Query keys for attendance-related queries
@@ -10,10 +10,13 @@ export const attendanceKeys = {
   today: (userId: string) => [...attendanceKeys.all, 'today', userId] as const,
   byDateRange: (userId: string, startDate: string, endDate: string) =>
     [...attendanceKeys.all, 'range', userId, startDate, endDate] as const,
+  byYearMonth: (userId: string, year: YearFilter, month: MonthFilter, page: number) =>
+    [...attendanceKeys.all, 'yearMonth', userId, year, month, page] as const,
   monthlySummary: (userId: string, month: number, year: number) =>
     [...attendanceKeys.all, 'monthly', userId, month, year] as const,
   currentWeek: (userId: string) => [...attendanceKeys.all, 'current-week', userId] as const,
   byId: (id: string) => [...attendanceKeys.all, 'detail', id] as const,
+  firstDate: (userId: string) => [...attendanceKeys.all, 'firstDate', userId] as const,
   hrAll: (filters?: object) => [...attendanceKeys.all, 'hr', 'all', filters] as const,
   hrToday: () => [...attendanceKeys.all, 'hr', 'today'] as const,
   hrCurrentWeekAll: () => [...attendanceKeys.all, 'hr', 'current-week-all'] as const,
@@ -204,6 +207,42 @@ export const useAllEmployeesAttendance = (
     staleTime: 0, // Always consider data stale to prevent showing cached data
     gcTime: 0, // Don't cache data to prevent cross-org data leakage
     refetchOnMount: 'always', // Always refetch when component mounts
+    ...options,
+  });
+};
+
+/**
+ * Hook to fetch attendance records by year and month
+ */
+export const useAttendanceByYearMonth = (
+  userId: string,
+  year: YearFilter,
+  month: MonthFilter,
+  page: number = 1,
+  pageSize: number = 50,
+  options?: Omit<UseQueryOptions<{ records: AttendanceRecord[]; totalCount: number; hasMore: boolean }>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: attendanceKeys.byYearMonth(userId, year, month, page),
+    queryFn: () => attendanceQueries.getAttendanceByYearMonth({ userId, year, month, page, pageSize }),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: !!userId,
+    ...options,
+  });
+};
+
+/**
+ * Hook to fetch user's first attendance date
+ */
+export const useFirstAttendanceDate = (
+  userId: string,
+  options?: Omit<UseQueryOptions<string | null>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: attendanceKeys.firstDate(userId),
+    queryFn: () => attendanceQueries.getFirstAttendanceDate(userId),
+    staleTime: 1000 * 60 * 30, // 30 minutes - rarely changes
+    enabled: !!userId,
     ...options,
   });
 };

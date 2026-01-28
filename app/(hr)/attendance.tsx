@@ -20,7 +20,7 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  View, 
+  View,
   Platform,
 } from "react-native";
 import { Text } from "@/components/ui/Text";
@@ -35,7 +35,13 @@ type SortOrder = "asc" | "desc";
 export default function HRAttendanceScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const organizationId = user?.organization_id || '';
+
+  // Day view state
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Common state
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<
@@ -52,31 +58,30 @@ export default function HRAttendanceScreen() {
   const [selectedRecordForBreak, setSelectedRecordForBreak] = useState<
     AttendanceWithUser | undefined
   >(undefined);
-  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const targetDate = formatDateToISO(selectedDate);
 
+  // Day view queries
   const {
-    data: records,
-    isLoading,
-    isFetching: isFetchingRecords,
-    refetch,
+    data: dayRecords,
+    isLoading: isDayLoading,
+    isFetching: isFetchingDayRecords,
+    refetch: refetchDayRecords,
   } = useHRAllEmployeesAttendance({
     date: targetDate,
-    organizationId: user?.organization_id || "",
+    organizationId,
   });
 
   const { data: allEmployees, isFetching: isFetchingEmployees } = useAllUsers({
     role: "employee",
     isActive: true,
-    organizationId: user?.organization_id || "",
+    organizationId,
   });
 
-  const isLoadingData = isLoading || isFetchingRecords || isFetchingEmployees;
+  const isLoadingData = isDayLoading || isFetchingDayRecords || isFetchingEmployees;
 
-  // Calculate statistics - only when data is not loading/fetching
-  const stats = useMemo(() => {
-    // Return zeros when loading to prevent showing stale data
+  // Calculate day view statistics
+  const dayStats = useMemo(() => {
     if (isLoadingData) {
       return {
         totalEmployees: 0,
@@ -87,17 +92,16 @@ export default function HRAttendanceScreen() {
     }
 
     const totalEmployees = allEmployees?.length || 0;
-    // Count both 'Present' (checked in + out) and 'Incomplete' (only checked in) as present
     const presentCount =
-      records?.filter((r) => {
+      dayRecords?.filter((r) => {
         const status = getAttendanceStatus(r);
         return status === "Present" || status === "Incomplete";
       }).length || 0;
     const totalHours =
-      records?.reduce((sum, r) => sum + (r.total_hours || 0), 0) || 0;
+      dayRecords?.reduce((sum, r) => sum + (r.total_hours || 0), 0) || 0;
     const averageHours =
-      records && records.length > 0 ? totalHours / records.length : 0;
-    const absentCount = totalEmployees - (records?.length || 0);
+      dayRecords && dayRecords.length > 0 ? totalHours / dayRecords.length : 0;
+    const absentCount = totalEmployees - (dayRecords?.length || 0);
 
     return {
       totalEmployees,
@@ -105,13 +109,13 @@ export default function HRAttendanceScreen() {
       absentCount,
       averageHours,
     };
-  }, [records, allEmployees, isLoadingData]);
+  }, [dayRecords, allEmployees, isLoadingData]);
 
   // Filter records
   const filteredRecords = useMemo(() => {
-    if (!records) return [];
+    if (!dayRecords) return [];
 
-    let filtered = [...records];
+    let filtered = [...dayRecords];
 
     // Apply search filter
     if (searchQuery.trim()) {
@@ -132,12 +136,12 @@ export default function HRAttendanceScreen() {
     }
 
     return filtered;
-  }, [records, searchQuery, statusFilter]);
+  }, [dayRecords, searchQuery, statusFilter]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      await refetch();
+      await refetchDayRecords();
     } finally {
       setRefreshing(false);
     }
@@ -150,9 +154,7 @@ export default function HRAttendanceScreen() {
   };
 
   const handleEditAttendance = (record: AttendanceRecord) => {
-    // Check if this is a placeholder record for an absent employee
     if (record.id.startsWith("absent-")) {
-      // For absent employees, open modal in "create" mode with employee pre-selected
       setSelectedRecord(undefined);
       setSelectedEmployeeId(record.user_id);
       setModalVisible(true);
@@ -188,9 +190,6 @@ export default function HRAttendanceScreen() {
 
   const nextDay = () => {
     const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
     if (selectedDate < now) {
       setSelectedDate((prev) => {
         const newDate = new Date(prev);
@@ -212,26 +211,26 @@ export default function HRAttendanceScreen() {
     }
   };
 
-  const statusFilterOptions = [
-    { value: "all" as StatusFilter, label: "All", count: records?.length || 0 },
-    {
-      value: "present" as StatusFilter,
-      label: "Present",
-      count: stats.presentCount,
-    },
-    {
-      value: "incomplete" as StatusFilter,
-      label: "Incomplete",
-      count:
-        records?.filter((r) => getAttendanceStatus(r) === "Incomplete")
-          .length || 0,
-    },
-    {
-      value: "absent" as StatusFilter,
-      label: "Absent",
-      count: stats.absentCount,
-    },
-  ];
+  const statusFilterOptions = useMemo(() => {
+    return [
+      { value: "all" as StatusFilter, label: "All", count: dayRecords?.length || 0 },
+      {
+        value: "present" as StatusFilter,
+        label: "Present",
+        count: dayStats.presentCount,
+      },
+      {
+        value: "incomplete" as StatusFilter,
+        label: "Incomplete",
+        count: dayRecords?.filter((r) => getAttendanceStatus(r) === "Incomplete").length || 0,
+      },
+      {
+        value: "absent" as StatusFilter,
+        label: "Absent",
+        count: dayStats.absentCount,
+      },
+    ];
+  }, [dayRecords, dayStats]);
 
   return (
     <View style={styles.container}>
@@ -249,7 +248,7 @@ export default function HRAttendanceScreen() {
           />
         }
       >
-        {/* Date Selector */}
+        {/* Day Selector */}
         <View style={styles.dateSelector}>
           <TouchableOpacity
             onPress={previousDay}
@@ -293,12 +292,12 @@ export default function HRAttendanceScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Statistics Cards */}
+        {/* Day View Statistics Cards */}
         <AttendanceStatsCards
-          totalEmployees={stats.totalEmployees}
-          presentCount={stats.presentCount}
-          absentCount={stats.absentCount}
-          averageHours={stats.averageHours}
+          totalEmployees={dayStats.totalEmployees}
+          presentCount={dayStats.presentCount}
+          absentCount={dayStats.absentCount}
+          averageHours={dayStats.averageHours}
           isLoading={isLoadingData}
         />
 

@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
-import { AttendanceRecord, AttendanceWithUser } from '@/lib/types';
+import { AttendanceRecord, AttendanceWithUser, YearFilter, MonthFilter } from '@/lib/types';
 
 export const attendanceQueries = {
   /**
@@ -462,5 +462,74 @@ export const attendanceQueries = {
     });
 
     return result as AttendanceWithUser[];
+  },
+
+  /**
+   * Get attendance records by year and month filter
+   * Supports "all" filter for both year and month
+   */
+  getAttendanceByYearMonth: async (params: {
+    userId: string;
+    year: YearFilter;
+    month: MonthFilter;
+    page?: number;
+    pageSize?: number;
+  }): Promise<{ records: AttendanceRecord[]; totalCount: number; hasMore: boolean }> => {
+    const { userId, year, month, page = 1, pageSize = 50 } = params;
+
+    let query = supabase
+      .from('attendance_records')
+      .select('*', { count: 'exact' })
+      .eq('user_id', userId);
+
+    // Apply date filters if not "all"
+    if (year !== 'all') {
+      if (month !== 'all') {
+        // Specific month
+        const startDate = new Date(year, month, 1).toISOString().split('T')[0];
+        const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
+        query = query.gte('date', startDate).lte('date', endDate);
+      } else {
+        // Full year
+        const startDate = new Date(year, 0, 1).toISOString().split('T')[0];
+        const endDate = new Date(year, 11, 31).toISOString().split('T')[0];
+        query = query.gte('date', startDate).lte('date', endDate);
+      }
+    }
+
+    // Apply pagination
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    const { data, error, count } = await query
+      .order('date', { ascending: false })
+      .range(from, to);
+
+    if (error) throw error;
+
+    const totalCount = count || 0;
+    const hasMore = from + pageSize < totalCount;
+
+    return {
+      records: data || [],
+      totalCount,
+      hasMore,
+    };
+  },
+
+  /**
+   * Get the first attendance date for a user (to determine available years)
+   */
+  getFirstAttendanceDate: async (userId: string): Promise<string | null> => {
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .select('date')
+      .eq('user_id', userId)
+      .order('date', { ascending: true })
+      .limit(1)
+      .single();
+
+    if (error && error.code !== 'PGRST116') throw error;
+    return data?.date || null;
   },
 };

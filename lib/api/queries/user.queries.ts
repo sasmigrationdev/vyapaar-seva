@@ -119,4 +119,18 @@ export const userQueries = {
     if (error) throw error;
     return data || [];
   },
+
+  /**
+   * Get auto check-in setting for a user
+   */
+  getAutoCheckinSetting: async (userId: string): Promise<boolean> => {
+    const { data, error } = await supabase
+      .from('users')
+      .select('auto_checkin_enabled')
+      .eq('id', userId)
+      .single();
+
+    if (error) throw error;
+    return data?.auto_checkin_enabled ?? false;
+  },
 };

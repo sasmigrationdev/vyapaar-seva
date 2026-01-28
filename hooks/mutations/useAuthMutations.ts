@@ -5,6 +5,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { router } from "expo-router";
+import { clearSettings as clearLocalAuthSettings } from "@/lib/localAuth/localAuth.service";
 
 /**
  * Hook for signing up (legacy - kept for backward compatibility)
@@ -116,6 +117,8 @@ export const useSignOut = (options?: UseMutationOptions<void, Error, void>) => {
   return useMutation({
     mutationFn: async () => {
       await authMutations.signOut();
+      // Clear local auth settings on sign out
+      await clearLocalAuthSettings();
       // Small delay to ensure auth state change propagates
       await new Promise((resolve) => setTimeout(resolve, 100));
     },

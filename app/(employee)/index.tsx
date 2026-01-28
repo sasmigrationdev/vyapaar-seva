@@ -24,6 +24,10 @@ import {
   useMonthlyAttendanceSummary,
   useTodayAttendance,
 } from "@/hooks/queries/useAttendance";
+import {
+  useUserAttendanceSummary,
+  attendanceSummaryKeys,
+} from "@/hooks/queries/useAttendanceSummary";
 import { useMyBreakRequests } from "@/hooks/queries/useBreakRequests";
 import { useCurrentMonthEarnings } from "@/hooks/queries/useEarnings";
 import { useOvertimeRequestByAttendance } from "@/hooks/queries/useOvertimeRequests";
@@ -31,6 +35,7 @@ import { useEmployeeJoinRequests } from "@/hooks/queries/useEmployerRequests";
 import { useCurrentEmployment } from "@/hooks/queries/useEmploymentHistory";
 import { useLatestSalary } from "@/hooks/queries/useSalary";
 import { useAutoRejectExpiredBreaks } from "@/hooks/useAutoRejectExpiredBreaks";
+import { useAutoAttendance } from "@/hooks/useAutoAttendance";
 import { WeekDay } from "@/lib/types";
 import {
   calculateBreakDuration,
@@ -103,6 +108,15 @@ export default function EmployeeDashboard() {
     isLoading: loadingEarnings,
     refetch: refetchEarnings,
   } = useCurrentMonthEarnings(userId);
+  const {
+    data: monthlyStats,
+    isLoading: monthlyStatsLoading,
+    refetch: refetchMonthlyStats,
+  } = useUserAttendanceSummary(
+    userId,
+    new Date().getFullYear(),
+    new Date().getMonth()
+  );
   const { data: myBreakRequests, refetch: refetchBreakRequests } =
     useMyBreakRequests(userId);
 
@@ -350,6 +364,25 @@ export default function EmployeeDashboard() {
   const isTodayWorking = isTodayWorkingDay(workingDays);
   const canCheckIn = !todayAttendance && isTodayWorking;
 
+  // Auto attendance based on WiFi connectivity
+  useAutoAttendance({
+    userId,
+    organizationId: user?.organization_id ?? undefined,
+    workingDays,
+    onAutoCheckin: () => {
+      success("Auto Check-In", "You've been automatically checked in via WiFi.");
+      refetchToday();
+    },
+    onAutoCheckout: () => {
+      success("Auto Check-Out", "You've been automatically checked out.");
+      refetchToday();
+    },
+    onBlocked: (reason) => {
+      // Silently log blocked auto-checkout (e.g., during break)
+      console.log("Auto check-out blocked:", reason);
+    },
+  });
+
   // Get time-based greeting
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -358,12 +391,21 @@ export default function EmployeeDashboard() {
     return "Good Evening";
   };
 
+  // Get attendance color based on percentage
+  const getAttendanceColor = (percentage?: number) => {
+    if (!percentage) return Colors.gray400;
+    if (percentage >= 90) return Colors.success;
+    if (percentage >= 70) return Colors.warning;
+    return Colors.error;
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     try {
       await Promise.all([
         refetchToday(),
         refetchMonthly(),
+        refetchMonthlyStats(),
         refetchSalary(),
         refetchEarnings(),
         refetchBreakRequests(),
@@ -427,44 +469,51 @@ export default function EmployeeDashboard() {
             </TouchableOpacity>
           </View>
 
-          {/* Attendance Status Metrics */}
+          {/* Monthly Attendance Summary */}
           <View style={styles.heroMetricsRow}>
             <View style={[styles.heroMetricCard, styles.heroMetricPrimary]}>
               <View
                 style={[styles.heroMetricIcon, styles.heroMetricIconOverlay]}
               >
-                <Ionicons
-                  name="log-in-outline"
+                <MaterialCommunityIcons
+                  name="clock-outline"
                   size={22}
                   color={Colors.primary}
                 />
               </View>
               <View style={styles.heroMetricContent}>
-                <Text style={styles.heroMetricLabel}>check in</Text>
+                <Text style={styles.heroMetricLabel}>this month</Text>
                 <Text style={styles.heroMetricValue} numberOfLines={1}>
-                  {todayAttendance?.check_in_time
-                    ? formatTime(new Date(todayAttendance.check_in_time))
-                    : "--:--"}
+                  {monthlyStatsLoading
+                    ? "--"
+                    : formatHours(monthlyStats?.totalWorkingHours || 0)}
                 </Text>
               </View>
             </View>
 
             <View style={[styles.heroMetricCard, styles.heroMetricSecondary]}>
               <View
-                style={[styles.heroMetricIcon, styles.heroMetricIconOverlay]}
+                style={[
+                  styles.heroMetricIcon,
+                  {
+                    backgroundColor:
+                      getAttendanceColor(monthlyStats?.attendancePercentage) +
+                      "20",
+                  },
+                ]}
               >
                 <Ionicons
-                  name="log-out-outline"
+                  name="trending-up-outline"
                   size={22}
-                  color={Colors.primary}
+                  color={getAttendanceColor(monthlyStats?.attendancePercentage)}
                 />
               </View>
               <View style={styles.heroMetricContent}>
-                <Text style={styles.heroMetricLabel}>check out</Text>
+                <Text style={styles.heroMetricLabel}>attendance</Text>
                 <Text style={styles.heroMetricValue} numberOfLines={1}>
-                  {todayAttendance?.check_out_time
-                    ? formatTime(new Date(todayAttendance.check_out_time))
-                    : "--:--"}
+                  {monthlyStatsLoading
+                    ? "--"
+                    : `${monthlyStats?.daysAttended || 0}d (${monthlyStats?.attendancePercentage || 0}%)`}
                 </Text>
               </View>
             </View>
@@ -757,6 +806,7 @@ export default function EmployeeDashboard() {
                           checkOutMutation.isPending
                         }
                         isCheckedIn={!!isCheckedIn}
+                        checkInTime={todayAttendance?.check_in_time}
                         size={140}
                       />
                     </View>
@@ -1592,7 +1642,7 @@ const styles = StyleSheet.create({
   liveText: {
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.semibold,
-    color: Colors.success,
+    color: "#065F46",
   },
   loadingContainer: {
     paddingVertical: Spacing["2xl"],

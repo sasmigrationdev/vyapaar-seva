@@ -20,11 +20,31 @@ import { QueryProvider } from '@/lib/providers/QueryProvider';
 import { useAuth } from '@/hooks/auth/useAuth';
 import { AlertProvider } from '@/hooks/useAlert';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { LocalAuthProvider, useLocalAuth, clearLocalAuthSettings } from '@/lib/providers/LocalAuthProvider';
+import { LocalAuthScreen } from '@/components/localAuth/LocalAuthScreen';
+import { WiFiConnectivityProvider } from '@/lib/providers/WiFiConnectivityProvider';
 
 // Keep the splash screen visible while we load fonts
 SplashScreen.preventAutoHideAsync();
 
-function RootLayoutNav() {
+/**
+ * Local Auth Gate - Shows lock screen when app is locked
+ */
+function LocalAuthGate({ children }: { children: React.ReactNode }) {
+  const { isLocked, isEnabled } = useLocalAuth();
+
+  // Show lock screen if enabled and locked
+  if (isEnabled && isLocked) {
+    return <LocalAuthScreen />;
+  }
+
+  return <>{children}</>;
+}
+
+/**
+ * Main Navigation with Local Auth
+ */
+function RootLayoutNavWithAuth() {
   const { session, user, loading, needsRoleSelection } = useAuth();
   const segments = useSegments();
   const router = useRouter();
@@ -84,13 +104,33 @@ function RootLayoutNav() {
   }
 
   return (
-    <Stack>
-      <Stack.Screen name="auth" options={{ headerShown: false }} />
-      <Stack.Screen name="(employee)" options={{ headerShown: false }} />
-      <Stack.Screen name="(hr)" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-    </Stack>
+    <LocalAuthGate>
+      <Stack>
+        <Stack.Screen name="auth" options={{ headerShown: false }} />
+        <Stack.Screen name="(employee)" options={{ headerShown: false }} />
+        <Stack.Screen name="(hr)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+      </Stack>
+    </LocalAuthGate>
+  );
+}
+
+/**
+ * Root Layout Nav with LocalAuthProvider and WiFiConnectivityProvider wrappers
+ */
+function RootLayoutNav() {
+  const { session, user } = useAuth();
+
+  return (
+    <LocalAuthProvider isAuthenticated={!!session}>
+      <WiFiConnectivityProvider
+        organizationId={user?.organization_id ?? undefined}
+        enabled={!!session}
+      >
+        <RootLayoutNavWithAuth />
+      </WiFiConnectivityProvider>
+    </LocalAuthProvider>
   );
 }
 

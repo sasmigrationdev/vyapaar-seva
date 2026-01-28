@@ -370,3 +370,58 @@ export interface EmployeeDashboardStatsExtended extends EmployeeDashboardStats {
 export interface HRDashboardStatsExtended extends HRDashboardStats {
   pendingJoinRequests: number;
 }
+
+// Attendance Period Summary types
+export interface AttendancePeriodSummary {
+  totalWorkingHours: number;
+  expectedWorkingDays: number;
+  daysAttended: number;
+  approvedLeaveDays: number;
+  absentDays: number;
+  approvedOvertimeHours: number;
+  attendancePercentage: number;
+}
+
+export interface OrganizationAttendanceSummary extends AttendancePeriodSummary {
+  employeeCount: number;
+}
+
+export type YearFilter = number | 'all';
+export type MonthFilter = number | 'all'; // 0-11 for months
+
+// WiFi Connectivity State for Auto Check-In
+export interface WiFiConnectivityState {
+  isConnected: boolean;
+  connectionType: 'wifi' | 'cellular' | 'none' | 'unknown';
+  ssid: string | null;
+  isOfficeWiFi: boolean;
+  lastChecked: Date | null;
+}
+
+// Auto Attendance Action Result
+export interface AutoAttendanceAction {
+  type: 'check-in' | 'check-out';
+  timestamp: Date;
+  success: boolean;
+  reason?: string;
+}
+
+// Auto Attendance State
+export interface AutoAttendanceState {
+  isEnabled: boolean;
+  lastAction: AutoAttendanceAction | null;
+  blockReason: string | null;
+  isProcessing: boolean;
+}
+
+// Payslip Download tracking
+export interface PayslipDownload {
+  id: string;
+  user_id: string;
+  month: number;
+  year: number;
+  downloaded_at: string;
+  device_platform?: string;
+  device_info?: string;
+  created_at: string;
+}

@@ -52,15 +52,18 @@ export default function BankAccountForm({
           <MaterialCommunityIcons name="numeric" size={20} color="#64748B" />
           <TextInput
             style={styles.input}
-            placeholder="Enter account number"
+            placeholder="e.g., 12345678901234"
             value={accountNumber}
-            onChangeText={onAccountNumberChange}
+            onChangeText={(text) => onAccountNumberChange(text.replace(/[^0-9]/g, ''))}
             keyboardType="numeric"
             placeholderTextColor="#94A3B8"
             editable={!readOnly}
             maxLength={18}
           />
         </View>
+        <Text style={styles.helperText}>
+          9-18 digits, numbers only
+        </Text>
       </View>
 
       <View style={styles.inputGroup}>
@@ -69,9 +72,9 @@ export default function BankAccountForm({
           <MaterialCommunityIcons name="bank-transfer" size={20} color="#64748B" />
           <TextInput
             style={styles.input}
-            placeholder="Enter IFSC code"
+            placeholder="e.g., SBIN0001234"
             value={ifscCode}
-            onChangeText={(text) => onIfscCodeChange(text.toUpperCase())}
+            onChangeText={(text) => onIfscCodeChange(text.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
             autoCapitalize="characters"
             placeholderTextColor="#94A3B8"
             editable={!readOnly}
@@ -79,7 +82,7 @@ export default function BankAccountForm({
           />
         </View>
         <Text style={styles.helperText}>
-          Example: SBIN0001234
+          4 letters + 0 + 6 alphanumeric (e.g., HDFC0000001)
         </Text>
       </View>
 

@@ -18,11 +18,15 @@ import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/hooks/auth/useAuth';
 import { useSignOut } from '@/hooks/mutations/useAuthMutations';
-import { useResetPassword, useUpdateProfile } from '@/hooks/mutations/useUserMutations';
+import { useResetPassword } from '@/hooks/mutations/useUserMutations';
 import { useIsCurrentlyEmployed } from '@/hooks/queries/useEmployerRequests';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useAutoCheckinSetting } from '@/hooks/queries/useUserSettings';
+import { useUpdateAutoCheckinSetting } from '@/hooks/mutations/useUserSettingsMutations';
 import { formatDate } from '@/lib/utils/date.utils';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, Gradients, CardStyles } from '@/constants/theme';
+import { LocalAuthSettings } from '@/components/localAuth/LocalAuthSettings';
+import { EditPersonalInfoModal, EditBankInfoModal } from '@/components/profile';
 
 // Utility: Mask sensitive data
 const maskValue = (value: string | null | undefined, visibleChars: number = 4, separator?: string): string => {
@@ -120,21 +124,35 @@ const InfoRow = ({
   );
 };
 
-// Section Header Component
-const SectionHeader = ({ icon, title }: { icon: string; title: string }) => (
+// Section Header Component with optional edit action
+interface SectionHeaderProps {
+  icon: string;
+  title: string;
+  onEdit?: () => void;
+  editLabel?: string;
+}
+
+const SectionHeader = ({ icon, title, onEdit, editLabel = 'Edit' }: SectionHeaderProps) => (
   <View style={styles.sectionHeader}>
-    <MaterialCommunityIcons name={icon as any} size={20} color={Colors.primary} />
-    <Text style={styles.sectionTitle}>{title}</Text>
+    <View style={styles.sectionHeaderLeft}>
+      <MaterialCommunityIcons name={icon as any} size={20} color={Colors.primary} />
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+    {onEdit && (
+      <TouchableOpacity onPress={onEdit} style={styles.sectionEditButton} activeOpacity={0.7}>
+        <Ionicons name="create-outline" size={16} color={Colors.primary} />
+        <Text style={styles.sectionEditText}>{editLabel}</Text>
+      </TouchableOpacity>
+    )}
   </View>
 );
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, refetchProfile } = useAuth();
   const { success, error, confirmDestructive } = useAlert();
   const signOutMutation = useSignOut();
   const resetPasswordMutation = useResetPassword();
-  const updateProfileMutation = useUpdateProfile(user?.id || '', {});
 
   const { data: isCurrentlyEmployed } = useIsCurrentlyEmployed(user?.id || '');
 
@@ -147,6 +165,10 @@ export default function ProfileScreen() {
     retryRegistration,
   } = usePushNotifications();
 
+  // Auto check-in setting
+  const { data: autoCheckinEnabled = false } = useAutoCheckinSetting(user?.id || '');
+  const updateAutoCheckinMutation = useUpdateAutoCheckinSetting(user?.id || '');
+
   const [refreshing, setRefreshing] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
@@ -155,8 +177,10 @@ export default function ProfileScreen() {
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [showPhoneModal, setShowPhoneModal] = useState(false);
-  const [newPhone, setNewPhone] = useState('');
+
+  // Profile edit modals
+  const [showPersonalInfoModal, setShowPersonalInfoModal] = useState(false);
+  const [showBankInfoModal, setShowBankInfoModal] = useState(false);
 
   // Visibility toggles for sensitive data
   const [showAadhaar, setShowAadhaar] = useState(false);
@@ -165,27 +189,6 @@ export default function ProfileScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 1000);
-  };
-
-  const handleUpdatePhone = () => {
-    if (!newPhone.trim()) {
-      error('Error', 'Please enter a phone number');
-      return;
-    }
-
-    updateProfileMutation.mutate(
-      { phone: newPhone.trim() },
-      {
-        onSuccess: () => {
-          success('Success', 'Phone number updated successfully');
-          setShowPhoneModal(false);
-          setNewPhone('');
-        },
-        onError: (err) => {
-          error('Error', err.message || 'Failed to update phone number');
-        },
-      }
-    );
   };
 
   const handleSignOut = () => {
@@ -255,6 +258,22 @@ export default function ProfileScreen() {
     } else {
       error('Error', 'Failed to enable push notifications. Please check your device settings.');
     }
+  };
+
+  const handleToggleAutoCheckin = () => {
+    updateAutoCheckinMutation.mutate(!autoCheckinEnabled, {
+      onSuccess: (enabled) => {
+        success(
+          enabled ? 'Auto Check-In Enabled' : 'Auto Check-In Disabled',
+          enabled
+            ? 'You will be automatically checked in/out based on office WiFi.'
+            : 'Automatic WiFi-based check-in/out has been disabled.'
+        );
+      },
+      onError: (err) => {
+        error('Error', err.message || 'Failed to update auto check-in setting');
+      },
+    });
   };
 
   const hasBankDetails = user?.bank_name || user?.account_number || user?.ifsc_code;
@@ -344,18 +363,17 @@ export default function ProfileScreen() {
 
         {/* Personal Information Card */}
         <View style={styles.card}>
-          <SectionHeader icon="account-circle" title="Personal Information" />
+          <SectionHeader
+            icon="account-circle"
+            title="Personal Information"
+            onEdit={() => setShowPersonalInfoModal(true)}
+          />
 
           <View style={styles.cardContent}>
             <InfoRow
               icon="call-outline"
               label="Phone Number"
               value={user?.phone}
-              editable
-              onEdit={() => {
-                setNewPhone(user?.phone || '');
-                setShowPhoneModal(true);
-              }}
             />
             <View style={styles.rowDivider} />
 
@@ -410,7 +428,12 @@ export default function ProfileScreen() {
 
         {/* Banking Information Card */}
         <View style={styles.card}>
-          <SectionHeader icon="bank" title="Banking Information" />
+          <SectionHeader
+            icon="bank"
+            title="Banking Information"
+            onEdit={() => setShowBankInfoModal(true)}
+            editLabel={hasBankDetails ? 'Edit' : 'Add'}
+          />
 
           {hasBankDetails ? (
             <View style={styles.cardContent}>
@@ -480,6 +503,14 @@ export default function ProfileScreen() {
               <MaterialCommunityIcons name="bank-off" size={40} color={Colors.gray300} />
               <Text style={styles.emptyStateTitle}>No bank details</Text>
               <Text style={styles.emptyStateSubtitle}>Your bank account details will appear here once added</Text>
+              <TouchableOpacity
+                style={styles.addBankButton}
+                onPress={() => setShowBankInfoModal(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add-circle-outline" size={18} color={Colors.primary} />
+                <Text style={styles.addBankButtonText}>Add Bank Details</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -577,6 +608,55 @@ export default function ProfileScreen() {
                 <Text style={styles.actionDescription}>Update your account password</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={Colors.gray300} />
+            </TouchableOpacity>
+
+            <View style={styles.rowDivider} />
+
+            <LocalAuthSettings />
+
+            <View style={styles.rowDivider} />
+
+            {/* Auto Check-In Setting */}
+            <TouchableOpacity
+              style={styles.actionRow}
+              onPress={handleToggleAutoCheckin}
+              disabled={updateAutoCheckinMutation.isPending}
+              activeOpacity={0.6}
+            >
+              <View style={[
+                styles.actionIconWrapper,
+                autoCheckinEnabled ? styles.actionIconSuccess : undefined
+              ]}>
+                <MaterialCommunityIcons
+                  name="wifi"
+                  size={20}
+                  color={autoCheckinEnabled ? Colors.success : Colors.primary}
+                />
+              </View>
+              <View style={styles.actionTextWrapper}>
+                <Text style={styles.actionLabel}>Auto Check-In</Text>
+                <Text style={[
+                  styles.actionDescription,
+                  autoCheckinEnabled && styles.successText,
+                ]}>
+                  {autoCheckinEnabled
+                    ? 'Auto check-in/out via WiFi enabled'
+                    : 'Check in/out based on office WiFi'}
+                </Text>
+              </View>
+              {updateAutoCheckinMutation.isPending ? (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              ) : (
+                <View style={[
+                  styles.toggleSwitch,
+                  autoCheckinEnabled && styles.toggleSwitchActive
+                ]}>
+                  <View style={[
+                    styles.toggleKnob,
+                    autoCheckinEnabled && styles.toggleKnobActive
+                  ]} />
+                </View>
+              )}
             </TouchableOpacity>
 
             <View style={styles.rowDivider} />
@@ -772,66 +852,21 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* Phone Edit Modal */}
-      <Modal
-        visible={showPhoneModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowPhoneModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Update Phone Number</Text>
-              <TouchableOpacity
-                onPress={() => setShowPhoneModal(false)}
-                style={styles.modalCloseButton}
-              >
-                <Ionicons name="close" size={24} color={Colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
+      {/* Edit Personal Info Modal */}
+      <EditPersonalInfoModal
+        visible={showPersonalInfoModal}
+        onClose={() => setShowPersonalInfoModal(false)}
+        user={user}
+        onSuccess={refetchProfile}
+      />
 
-            <View style={styles.modalBody}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Phone Number</Text>
-                <View style={styles.phoneInputContainer}>
-                  <Ionicons name="call-outline" size={20} color={Colors.textSecondary} style={{ marginLeft: 16 }} />
-                  <TextInput
-                    style={styles.phoneInput}
-                    value={newPhone}
-                    onChangeText={setNewPhone}
-                    placeholder="Enter phone number"
-                    placeholderTextColor={Colors.textTertiary}
-                    keyboardType="phone-pad"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={() => setShowPhoneModal(false)}
-                  disabled={updateProfileMutation.isPending}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.confirmButton}
-                  onPress={handleUpdatePhone}
-                  disabled={updateProfileMutation.isPending}
-                >
-                  {updateProfileMutation.isPending ? (
-                    <ActivityIndicator size="small" color={Colors.textInverse} />
-                  ) : (
-                    <Text style={styles.confirmButtonText}>Update Phone</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Edit Bank Info Modal */}
+      <EditBankInfoModal
+        visible={showBankInfoModal}
+        onClose={() => setShowBankInfoModal(false)}
+        user={user}
+        onSuccess={refetchProfile}
+      />
     </View>
   );
 }
@@ -971,16 +1006,33 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    justifyContent: 'space-between',
     padding: Spacing.lg,
     paddingBottom: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.gray100,
   },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
   sectionTitle: {
     fontSize: Typography.fontSize.base,
     fontWeight: '700',
     color: Colors.text,
+  },
+  sectionEditButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+  },
+  sectionEditText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '600',
+    color: Colors.primary,
   },
 
   // Info Row
@@ -1091,6 +1143,21 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
   },
+  addBankButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginTop: Spacing.md,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    backgroundColor: Colors.primary + '15',
+    borderRadius: BorderRadius.lg,
+  },
+  addBankButtonText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
 
   // Sign Out Button
   signOutButton: {
@@ -1185,21 +1252,6 @@ const styles = StyleSheet.create({
   eyeIcon: {
     padding: Spacing.md,
   },
-  phoneInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  phoneInput: {
-    flex: 1,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    fontSize: Typography.fontSize.base,
-    color: Colors.text,
-  },
   modalActions: {
     flexDirection: 'row',
     gap: Spacing.md,
@@ -1254,5 +1306,31 @@ const styles = StyleSheet.create({
     color: Colors.textInverse,
     fontSize: Typography.fontSize.sm,
     fontWeight: '600',
+  },
+  // Toggle Switch Styles
+  toggleSwitch: {
+    width: 48,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.gray200,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleSwitchActive: {
+    backgroundColor: Colors.success,
+  },
+  toggleKnob: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.background,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  toggleKnobActive: {
+    alignSelf: 'flex-end',
   },
 });

@@ -31,6 +31,7 @@ import {
 import { useAlert } from "@/hooks/useAlert";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LocalAuthSettings } from "@/components/localAuth/LocalAuthSettings";
 
 export default function HRProfileScreen() {
   const { user } = useAuth();
@@ -581,6 +582,10 @@ export default function HRProfileScreen() {
                 color={Colors.gray300}
               />
             </TouchableOpacity>
+
+            <View style={styles.divider} />
+
+            <LocalAuthSettings />
 
             <View style={styles.divider} />
 
