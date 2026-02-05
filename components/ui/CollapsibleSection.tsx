@@ -1,20 +1,18 @@
 import { Text } from "@/components/ui/Text";
-import { Colors, BorderRadius, Spacing, Shadows } from "@/constants/theme";
+import { Colors, BorderRadius, Spacing, Shadows, PressOpacity } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useCallback } from "react";
 import {
   StyleSheet,
   View,
   TouchableOpacity,
-  LayoutAnimation,
-  Platform,
-  UIManager,
 } from "react-native";
-
-// Enable LayoutAnimation for Android
-if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+} from "react-native-reanimated";
 
 interface CollapsibleSectionProps {
   title: string;
@@ -39,14 +37,36 @@ export default function CollapsibleSection({
 }: CollapsibleSectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
+  // Animation values
+  const rotation = useSharedValue(defaultExpanded ? 180 : 0);
+  const contentOpacity = useSharedValue(defaultExpanded ? 1 : 0);
+
+  const chevronStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
+  }));
+
+  const contentAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: contentOpacity.value,
+  }));
+
   const toggleSection = useCallback(() => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setIsExpanded((prev) => {
-      const newValue = !prev;
-      onToggle?.(newValue);
-      return newValue;
+    const newValue = !isExpanded;
+
+    // Animate chevron rotation - smoother
+    rotation.value = withTiming(newValue ? 180 : 0, {
+      duration: 280,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
     });
-  }, [onToggle]);
+
+    // Animate content opacity - smoother
+    contentOpacity.value = withTiming(newValue ? 1 : 0, {
+      duration: 220,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+    });
+
+    setIsExpanded(newValue);
+    onToggle?.(newValue);
+  }, [isExpanded, onToggle, rotation, contentOpacity]);
 
   return (
     <View style={styles.container}>
@@ -54,7 +74,10 @@ export default function CollapsibleSection({
       <TouchableOpacity
         style={styles.header}
         onPress={toggleSection}
-        activeOpacity={0.7}
+        activeOpacity={PressOpacity.secondary}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: isExpanded }}
+        accessibilityLabel={`${title} section, ${isExpanded ? 'expanded' : 'collapsed'}`}
       >
         <View style={styles.headerLeft}>
           {icon && (
@@ -75,17 +98,21 @@ export default function CollapsibleSection({
           </View>
         </View>
 
-        <View style={[styles.chevron, isExpanded && styles.chevronExpanded]}>
+        <Animated.View style={[styles.chevron, chevronStyle]}>
           <Ionicons
             name="chevron-down"
             size={20}
             color={Colors.textSecondary}
           />
-        </View>
+        </Animated.View>
       </TouchableOpacity>
 
-      {/* Content */}
-      {isExpanded && <View style={styles.content}>{children}</View>}
+      {/* Content with animation */}
+      {isExpanded && (
+        <Animated.View style={[styles.content, contentAnimatedStyle]}>
+          {children}
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -93,18 +120,22 @@ export default function CollapsibleSection({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.08)",
+    borderColor: "rgba(0,0,0,0.05)",
     overflow: "hidden",
-    ...Shadows.sm,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.lg + 2,
   },
   headerLeft: {
     flex: 1,
@@ -113,15 +144,15 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   iconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     justifyContent: "center",
     alignItems: "center",
   },
   titleContainer: {
     flex: 1,
-    gap: 2,
+    gap: 3,
   },
   titleRow: {
     flexDirection: "row",
@@ -131,22 +162,22 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: "600",
-    color: Colors.text,
+    color: "#1A1A1A",
     letterSpacing: -0.2,
   },
   subtitle: {
     fontSize: 13,
     fontWeight: "500",
-    color: Colors.textSecondary,
+    color: "#6B6B6B",
   },
   badge: {
     backgroundColor: Colors.primary,
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 6,
+    paddingHorizontal: 7,
   },
   badgeText: {
     fontSize: 11,
@@ -154,18 +185,15 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   chevron: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: Colors.gray50,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: "#F5F5F5",
     justifyContent: "center",
     alignItems: "center",
   },
-  chevronExpanded: {
-    transform: [{ rotate: "180deg" }],
-  },
   content: {
     borderTopWidth: 1,
-    borderTopColor: "rgba(0,0,0,0.08)",
+    borderTopColor: "rgba(0,0,0,0.05)",
   },
 });

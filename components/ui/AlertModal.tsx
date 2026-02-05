@@ -15,6 +15,7 @@ import {
   BorderRadius,
   Shadows,
   Spacing,
+  StatusColors,
 } from "@/constants/theme";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -48,27 +49,27 @@ const typeConfig: Record<
   success: {
     icon: "checkmark-circle",
     iconColor: Colors.success,
-    iconBg: "#D1FAE5",
+    iconBg: StatusColors.approved.background,
   },
   error: {
     icon: "close-circle",
     iconColor: Colors.error,
-    iconBg: "#FEE2E2",
+    iconBg: StatusColors.rejected.background,
   },
   warning: {
     icon: "warning",
     iconColor: Colors.warning,
-    iconBg: "#FEF3C7",
+    iconBg: StatusColors.pending.background,
   },
   info: {
     icon: "information-circle",
     iconColor: Colors.info,
-    iconBg: "#DBEAFE",
+    iconBg: "#DBEAFE", // Info background - using existing value as no StatusColors.info exists
   },
   confirm: {
     icon: "help-circle",
     iconColor: Colors.primary,
-    iconBg: "#FFEDD5",
+    iconBg: "#FFEDD5", // Confirm background - using existing value for primary tint
   },
 };
 
@@ -190,6 +191,9 @@ export default function AlertModal({
                       style={buttonStyle.container}
                       onPress={() => handleButtonPress(button)}
                       activeOpacity={0.8}
+                      accessibilityLabel={button.text}
+                      accessibilityRole="button"
+                      accessibilityHint={button.style === 'destructive' ? 'This action cannot be undone' : undefined}
                     >
                       <Text style={buttonStyle.text}>{button.text}</Text>
                     </TouchableOpacity>
@@ -314,9 +318,9 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   destructiveButton: {
-    backgroundColor: "#FEE2E2",
+    backgroundColor: StatusColors.rejected.background,
     borderWidth: 1,
-    borderColor: "#FCA5A5",
+    borderColor: StatusColors.rejected.border,
   },
   destructiveButtonText: {
     fontSize: 15,

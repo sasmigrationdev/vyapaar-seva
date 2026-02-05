@@ -17,7 +17,7 @@ import { BlurView } from "expo-blur";
 import { Text } from "@/components/ui/Text";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors, BorderRadius } from "@/constants/theme";
+import { Colors, BorderRadius, Gradients } from "@/constants/theme";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -197,7 +197,7 @@ export default function WelcomeScreen() {
         {/* Background - Gradient for first slide, Image for others */}
         {isFirstSlide ? (
           <LinearGradient
-            colors={["#E67300", "#FF9933", "#FFB366", "#FFCC80"]}
+            colors={[...Gradients.saffronHero, "#FFCC80"]}
             locations={[0, 0.3, 0.6, 1]}
             start={{ x: 0, y: 0 }}
             end={{ x: 0.3, y: 1 }}
@@ -362,7 +362,7 @@ export default function WelcomeScreen() {
           activeOpacity={0.9}
         >
           <LinearGradient
-            colors={["#FF9933", "#E67300"]}
+            colors={[Colors.primary, Colors.primaryDark]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.buttonGradient}
@@ -456,12 +456,12 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   languageText: {
-    color: "#FFFFFF",
+    color: Colors.textInverse,
     fontSize: 14,
     fontWeight: "600",
   },
   skipText: {
-    color: "#FFFFFF",
+    color: Colors.textInverse,
     fontSize: 14,
     fontWeight: "600",
   },
@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.3)",
   },
   sloganText: {
-    color: "#FFFFFF",
+    color: Colors.textInverse,
     fontSize: 15,
     fontWeight: "700",
     letterSpacing: 1.5,
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 36,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: Colors.textInverse,
     marginBottom: 8,
     letterSpacing: -0.5,
   },
@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#FF9933",
+    color: Colors.primary,
     marginBottom: 16,
     letterSpacing: 0.5,
   },
@@ -567,7 +567,7 @@ const styles = StyleSheet.create({
   actionButton: {
     borderRadius: 16,
     overflow: "hidden",
-    shadowColor: "#FF9933",
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
@@ -582,7 +582,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   buttonText: {
-    color: "#FFFFFF",
+    color: Colors.textInverse,
     fontSize: 18,
     fontWeight: "700",
     letterSpacing: 0.5,
@@ -607,7 +607,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: "100%",
-    backgroundColor: "#FF9933",
+    backgroundColor: Colors.primary,
     borderRadius: 2,
   },
 });

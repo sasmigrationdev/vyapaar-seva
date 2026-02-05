@@ -247,6 +247,22 @@ export const useFirstAttendanceDate = (
   });
 };
 
+/**
+ * HR: Hook to fetch weekly attendance trend (last 7 days)
+ */
+export const useWeeklyAttendanceTrend = (
+  organizationId: string,
+  options?: Omit<UseQueryOptions<{ date: string; dayLabel: string; count: number }[]>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: [...attendanceKeys.all, 'hr', 'weekly-trend', organizationId],
+    queryFn: () => attendanceQueries.getWeeklyAttendanceTrend(organizationId),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: !!organizationId,
+    ...options,
+  });
+};
+
 // Aliases for HR hooks
 export const useHRTodayAttendance = useTodayAllAttendance;
 export const useHRAllAttendanceRecords = useAllAttendanceRecords;

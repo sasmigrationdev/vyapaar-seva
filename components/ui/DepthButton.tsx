@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Text } from '@/components/ui/Text';
-import { Colors, BorderRadius, Typography } from '@/constants/theme';
+import { Colors, BorderRadius, Typography, AnimationPresets } from '@/constants/theme';
 
 interface DepthButtonProps {
   onPress: () => void;
@@ -20,27 +20,29 @@ interface DepthButtonProps {
   children: React.ReactNode;
   style?: ViewStyle;
   depthHeight?: number;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 }
 
 const variantColors = {
   primary: {
     surface: Colors.primary,
-    depth: '#C44A00', // Darker shade of primary (saffron)
+    depth: Colors.primaryDark,
     text: Colors.textInverse,
   },
   danger: {
-    surface: '#EF4444',
-    depth: '#B91C1C',
+    surface: Colors.error,
+    depth: Colors.errorDark,
     text: Colors.textInverse,
   },
   success: {
-    surface: '#10B981',
-    depth: '#047857',
+    surface: Colors.success,
+    depth: Colors.successDark,
     text: Colors.textInverse,
   },
   warning: {
-    surface: '#F59E0B',
-    depth: '#B45309',
+    surface: Colors.warning,
+    depth: Colors.warningDark,
     text: Colors.textInverse,
   },
 };
@@ -82,6 +84,8 @@ export function DepthButton({
   children,
   style,
   depthHeight: customDepthHeight,
+  accessibilityLabel,
+  accessibilityHint,
 }: DepthButtonProps) {
   const animation = useRef(new Animated.Value(0)).current;
   const colors = variantColors[variant];
@@ -90,18 +94,20 @@ export function DepthButton({
 
   const handlePressIn = () => {
     if (disabled || loading) return;
-    Animated.timing(animation, {
+    Animated.spring(animation, {
       toValue: 1,
-      duration: 80,
+      damping: AnimationPresets.springConfig.damping,
+      stiffness: AnimationPresets.springConfig.stiffness * 2, // Faster response for button press
       useNativeDriver: false,
     }).start();
   };
 
   const handlePressOut = () => {
     if (disabled || loading) return;
-    Animated.timing(animation, {
+    Animated.spring(animation, {
       toValue: 0,
-      duration: 100,
+      damping: AnimationPresets.springConfig.damping,
+      stiffness: AnimationPresets.springConfig.stiffness,
       useNativeDriver: false,
     }).start();
   };
@@ -143,6 +149,10 @@ export function DepthButton({
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         disabled={disabled || loading}
+        accessibilityLabel={accessibilityLabel || (typeof children === 'string' ? children : undefined)}
+        accessibilityHint={accessibilityHint}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: disabled || loading }}
       >
         <Animated.View
           style={[

@@ -1,5 +1,5 @@
-import { differenceInHours, differenceInMinutes } from 'date-fns';
-import { AttendanceBreak } from '@/lib/types';
+import { differenceInHours, differenceInMinutes, differenceInDays, parseISO, startOfDay, subDays } from 'date-fns';
+import { AttendanceBreak, AttendanceRecord } from '@/lib/types';
 
 /**
  * Calculate total hours worked (without break deduction)
@@ -213,4 +213,79 @@ export const calculateNetHoursWithBreakRequests = (
 ): number => {
   const breakHours = calculateApprovedBreakHours(breakRequests);
   return Math.max(0, totalHours - breakHours);
+};
+
+/**
+ * Calculate attendance streak from attendance records
+ * Returns current streak (consecutive days from today backwards) and longest streak
+ */
+export const calculateAttendanceStreak = (
+  records: Pick<AttendanceRecord, 'date' | 'check_in_time'>[]
+): { currentStreak: number; longestStreak: number } => {
+  if (!records || records.length === 0) {
+    return { currentStreak: 0, longestStreak: 0 };
+  }
+
+  // Filter records with valid check-in times and sort by date descending
+  const validRecords = records
+    .filter((r) => r.check_in_time)
+    .map((r) => startOfDay(parseISO(r.date)))
+    .sort((a, b) => b.getTime() - a.getTime());
+
+  if (validRecords.length === 0) {
+    return { currentStreak: 0, longestStreak: 0 };
+  }
+
+  // Remove duplicates (same day)
+  const uniqueDates = validRecords.filter(
+    (date, index, arr) =>
+      index === 0 || date.getTime() !== arr[index - 1].getTime()
+  );
+
+  // Calculate current streak (from today/yesterday backwards)
+  let currentStreak = 0;
+  const today = startOfDay(new Date());
+  const yesterday = subDays(today, 1);
+
+  // Check if the most recent record is today or yesterday
+  const mostRecent = uniqueDates[0];
+  const daysDiff = differenceInDays(today, mostRecent);
+
+  if (daysDiff <= 1) {
+    // Start counting from the most recent day
+    currentStreak = 1;
+    let expectedDate = subDays(mostRecent, 1);
+
+    for (let i = 1; i < uniqueDates.length; i++) {
+      const recordDate = uniqueDates[i];
+      const diff = differenceInDays(expectedDate, recordDate);
+
+      if (diff === 0) {
+        currentStreak++;
+        expectedDate = subDays(expectedDate, 1);
+      } else {
+        break;
+      }
+    }
+  }
+
+  // Calculate longest streak
+  let longestStreak = 1;
+  let tempStreak = 1;
+
+  for (let i = 1; i < uniqueDates.length; i++) {
+    const diff = differenceInDays(uniqueDates[i - 1], uniqueDates[i]);
+
+    if (diff === 1) {
+      tempStreak++;
+      longestStreak = Math.max(longestStreak, tempStreak);
+    } else {
+      tempStreak = 1;
+    }
+  }
+
+  return {
+    currentStreak,
+    longestStreak: Math.max(longestStreak, currentStreak),
+  };
 };

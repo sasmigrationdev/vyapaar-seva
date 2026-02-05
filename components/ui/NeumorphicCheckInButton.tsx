@@ -8,8 +8,9 @@ import {
   Platform,
   Easing,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Text } from '@/components/ui/Text';
-import { Colors } from '@/constants/theme';
+import { Colors, AnimationPresets } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 
 interface NeumorphicCheckInButtonProps {
@@ -101,6 +102,10 @@ export function NeumorphicCheckInButton({
 
   const handlePressIn = () => {
     if (disabled || loading) return;
+    // Haptic feedback on press
+    if (Platform.OS !== 'web' && AnimationPresets.hapticEnabled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
     Animated.timing(animation, {
       toValue: 1,
       duration: 100,
@@ -151,7 +156,7 @@ export function NeumorphicCheckInButton({
   });
 
   const size = 240;
-  const buttonColor = isCheckedIn ? '#EF4444' : Colors.primary;
+  const buttonColor = isCheckedIn ? Colors.error : Colors.primary;
   const iconName = isCheckedIn ? 'exit-outline' : 'finger-print';
   const buttonText = isCheckedIn ? 'CHECK OUT' : 'CHECK IN';
 
@@ -167,7 +172,7 @@ export function NeumorphicCheckInButton({
               height: size + 30,
               borderRadius: (size + 30) / 2,
               opacity: glowOpacity,
-              backgroundColor: '#F87171',
+              backgroundColor: Colors.errorLight,
               transform: [{ scale: breathingScale }],
             },
           ]}
@@ -191,6 +196,10 @@ export function NeumorphicCheckInButton({
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         disabled={disabled || loading}
+        accessibilityLabel={isCheckedIn ? "Check out from work" : "Check in to work"}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: disabled || loading }}
+        accessibilityHint={isCheckedIn ? "Double-tap to end your work session and check out" : "Double-tap to start your work session and check in"}
       >
         <Animated.View
           style={[
@@ -204,7 +213,7 @@ export function NeumorphicCheckInButton({
               ],
               shadowOpacity: isCheckedIn && !loading ? breathingShadowOpacity : shadowOpacity,
               shadowRadius: isCheckedIn && !loading ? breathingShadowRadius : 12,
-              shadowColor: isCheckedIn ? '#EF4444' : '#888',
+              shadowColor: isCheckedIn ? Colors.error : Colors.gray500,
             },
             disabled && styles.disabledOuter,
           ]}
@@ -272,17 +281,17 @@ const styles = StyleSheet.create({
   },
   dropShadow: {
     position: 'absolute',
-    backgroundColor: '#D4D7DC',
+    backgroundColor: Colors.gray300,
   },
   outerCircle: {
-    backgroundColor: '#E8EAED',
+    backgroundColor: Colors.gray200,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#D4D7DC',
+    borderColor: Colors.gray300,
     ...Platform.select({
       ios: {
-        shadowColor: '#888',
+        shadowColor: Colors.gray500,
         shadowOffset: { width: 0, height: 0 },
         shadowRadius: 10,
         shadowOpacity: 0.25,
@@ -293,15 +302,15 @@ const styles = StyleSheet.create({
     }),
   },
   disabledOuter: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: Colors.gray200,
   },
   innerCircle: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
   disabledInner: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.backgroundSecondary,
   },
   content: {
     alignItems: 'center',

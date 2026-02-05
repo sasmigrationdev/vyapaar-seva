@@ -3,6 +3,7 @@ import {
   Colors,
   Shadows,
   Spacing,
+  StatusColors,
   Typography,
 } from "@/constants/theme";
 import { useAuth } from "@/hooks/auth/useAuth";
@@ -21,6 +22,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useAlert } from "@/hooks/useAlert";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@/components/ui/Text";
@@ -96,18 +98,18 @@ export default function HRLeaveScreen() {
     return true; // 'all' tab shows everything
   });
 
-  const renderLeaveItem = ({ item }: { item: LeaveRequestWithUser }) => {
+  const renderLeaveItem = ({ item, index }: { item: LeaveRequestWithUser; index: number }) => {
     const statusConfig = {
-      pending: { bg: "#FEF3C7", color: "#F59E0B", icon: "clock-outline" },
-      approved: { bg: "#DCFCE7", color: "#10B981", icon: "check-circle" },
-      rejected: { bg: "#FEE2E2", color: "#EF4444", icon: "close-circle" },
+      pending: { bg: StatusColors.pending.background, color: Colors.warning, icon: "clock-outline" },
+      approved: { bg: StatusColors.approved.background, color: Colors.success, icon: "check-circle" },
+      rejected: { bg: StatusColors.rejected.background, color: Colors.error, icon: "close-circle" },
     };
     const leaveTypeConfig = {
-      sick: { bg: "#FEE2E2", color: "#EF4444", icon: "medical-bag" },
-      casual: { bg: "#DBEAFE", color: "#3B82F6", icon: "coffee" },
-      earned: { bg: "#DCFCE7", color: "#10B981", icon: "star" },
-      unpaid: { bg: "#F3E8FF", color: "#A855F7", icon: "cash-off" },
-      other: { bg: "#F1F5F9", color: "#64748B", icon: "dots-horizontal" },
+      sick: { bg: StatusColors.rejected.background, color: Colors.error, icon: "medical-bag" },
+      casual: { bg: StatusColors.info.background, color: Colors.info, icon: "coffee" },
+      earned: { bg: StatusColors.approved.background, color: Colors.success, icon: "star" },
+      unpaid: { bg: Colors.purpleLight, color: Colors.purple, icon: "cash-off" },
+      other: { bg: Colors.gray100, color: Colors.gray500, icon: "dots-horizontal" },
     };
     const config =
       statusConfig[item.status as keyof typeof statusConfig] ||
@@ -117,7 +119,7 @@ export default function HRLeaveScreen() {
       leaveTypeConfig.other;
 
     return (
-      <View style={styles.card}>
+      <Animated.View entering={FadeInDown.delay(150 + index * 80).springify()} style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.cardHeaderLeft}>
             <View
@@ -149,7 +151,7 @@ export default function HRLeaveScreen() {
         <View style={styles.dateRangeContainer}>
           <View style={styles.dateRow}>
             <View style={styles.dateRowLeft}>
-              <Ionicons name="calendar-outline" size={18} color="#64748B" />
+              <Ionicons name="calendar-outline" size={18} color={Colors.gray500} />
               <Text style={styles.dateLabel}>From</Text>
             </View>
             <Text style={styles.dateValue}>
@@ -161,7 +163,7 @@ export default function HRLeaveScreen() {
 
           <View style={styles.dateRow}>
             <View style={styles.dateRowLeft}>
-              <Ionicons name="calendar" size={18} color="#64748B" />
+              <Ionicons name="calendar" size={18} color={Colors.gray500} />
               <Text style={styles.dateLabel}>To</Text>
             </View>
             <Text style={styles.dateValue}>
@@ -176,7 +178,7 @@ export default function HRLeaveScreen() {
               <MaterialCommunityIcons
                 name="calendar-range"
                 size={18}
-                color="#64748B"
+                color={Colors.gray500}
               />
               <Text style={styles.dateLabel}>Total Days</Text>
             </View>
@@ -188,7 +190,7 @@ export default function HRLeaveScreen() {
 
         <View style={styles.reasonContainer}>
           <View style={styles.reasonHeader}>
-            <Feather name="message-square" size={16} color="#64748B" />
+            <Feather name="message-square" size={16} color={Colors.gray500} />
             <Text style={styles.reasonLabel}>Reason</Text>
           </View>
           <Text style={styles.reasonText}>{item.reason}</Text>
@@ -201,12 +203,15 @@ export default function HRLeaveScreen() {
               onPress={() => handleReject(item.id)}
               disabled={reviewMutation.isPending}
               activeOpacity={0.7}
+              accessibilityLabel="Reject leave request"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: reviewMutation.isPending }}
             >
               {reviewMutation.isPending ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator size="small" color={Colors.textInverse} />
               ) : (
                 <>
-                  <Ionicons name="close-circle" size={20} color="#FFFFFF" />
+                  <Ionicons name="close-circle" size={20} color={Colors.textInverse} />
                   <Text style={styles.rejectButtonText}>Reject</Text>
                 </>
               )}
@@ -217,12 +222,15 @@ export default function HRLeaveScreen() {
               onPress={() => handleApprove(item.id)}
               disabled={reviewMutation.isPending}
               activeOpacity={0.7}
+              accessibilityLabel="Approve leave request"
+              accessibilityRole="button"
+              accessibilityState={{ disabled: reviewMutation.isPending }}
             >
               {reviewMutation.isPending ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator size="small" color={Colors.textInverse} />
               ) : (
                 <>
-                  <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+                  <Ionicons name="checkmark-circle" size={20} color={Colors.textInverse} />
                   <Text style={styles.approveButtonText}>Approve</Text>
                 </>
               )}
@@ -236,14 +244,14 @@ export default function HRLeaveScreen() {
               <MaterialCommunityIcons
                 name="comment-text-outline"
                 size={16}
-                color="#6366F1"
+                color={Colors.indigo}
               />
               <Text style={styles.reviewerNotesLabel}>Reviewer Notes</Text>
             </View>
             <Text style={styles.reviewerNotesText}>{item.reviewer_notes}</Text>
           </View>
         )}
-      </View>
+      </Animated.View>
     );
   };
 
@@ -271,11 +279,14 @@ export default function HRLeaveScreen() {
       </View>
 
       {/* Tabs */}
-      <View style={styles.tabsContainer}>
+      <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.tabsContainer}>
         <TouchableOpacity
           style={[styles.tab, activeTab === "pending" && styles.activeTab]}
           onPress={() => setActiveTab("pending")}
           activeOpacity={0.7}
+          accessibilityLabel={`Pending tab, ${leaveRequests?.filter((r) => r.status === "pending")?.length ?? 0} requests`}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === "pending" }}
         >
           <Text
             style={[
@@ -300,6 +311,9 @@ export default function HRLeaveScreen() {
           style={[styles.tab, activeTab === "all" && styles.activeTab]}
           onPress={() => setActiveTab("all")}
           activeOpacity={0.7}
+          accessibilityLabel={`All tab, ${leaveRequests?.length ?? 0} requests`}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === "all" }}
         >
           <Text
             style={[
@@ -315,11 +329,11 @@ export default function HRLeaveScreen() {
             </View>
           )}
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6366F1" />
+          <ActivityIndicator size="large" color={Colors.indigo} />
         </View>
       ) : filteredLeaveRequests && filteredLeaveRequests.length > 0 ? (
         <FlatList
@@ -332,14 +346,14 @@ export default function HRLeaveScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              colors={["#6366F1"]}
-              tintColor="#6366F1"
+              colors={[Colors.indigo]}
+              tintColor={Colors.indigo}
             />
           }
         />
       ) : (
         <View style={styles.emptyContainer}>
-          <MaterialCommunityIcons name="beach" size={64} color="#CBD5E1" />
+          <MaterialCommunityIcons name="beach" size={64} color={Colors.gray300} />
           <Text style={styles.emptyText}>
             {activeTab === "pending"
               ? "No pending requests"
@@ -451,7 +465,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: Spacing.lg,
   },
   cardHeaderLeft: {
     flexDirection: "row",
@@ -469,12 +483,12 @@ const styles = StyleSheet.create({
   leaveTypeTitle: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#0F172A",
+    color: Colors.text,
     textTransform: "capitalize",
   },
   cardSubtext: {
     fontSize: 12,
-    color: "#64748B",
+    color: Colors.gray500,
     fontWeight: "500",
     marginTop: 2,
   },
@@ -489,7 +503,7 @@ const styles = StyleSheet.create({
     textTransform: "capitalize",
   },
   dateRangeContainer: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: Colors.backgroundSecondary,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -506,17 +520,17 @@ const styles = StyleSheet.create({
   },
   dateLabel: {
     fontSize: 14,
-    color: "#64748B",
+    color: Colors.gray500,
     fontWeight: "600",
   },
   dateValue: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#0F172A",
+    color: Colors.text,
   },
   dateDivider: {
     height: 1,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: Colors.border,
     marginVertical: 12,
   },
   reasonContainer: {
@@ -530,14 +544,14 @@ const styles = StyleSheet.create({
   },
   reasonLabel: {
     fontSize: 13,
-    color: "#64748B",
+    color: Colors.gray500,
     fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   reasonText: {
     fontSize: 14,
-    color: "#334155",
+    color: Colors.gray700,
     lineHeight: 20,
   },
   actions: {
@@ -547,7 +561,7 @@ const styles = StyleSheet.create({
   },
   approveButton: {
     flex: 1,
-    backgroundColor: "#10B981",
+    backgroundColor: Colors.success,
     flexDirection: "row",
     paddingVertical: 14,
     paddingHorizontal: 16,
@@ -555,20 +569,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    shadowColor: "#10B981",
+    shadowColor: Colors.success,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
   approveButtonText: {
-    color: "#FFFFFF",
+    color: Colors.textInverse,
     fontSize: 15,
     fontWeight: "600",
   },
   rejectButton: {
     flex: 1,
-    backgroundColor: "#EF4444",
+    backgroundColor: Colors.error,
     flexDirection: "row",
     paddingVertical: 14,
     paddingHorizontal: 16,
@@ -576,24 +590,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    shadowColor: "#EF4444",
+    shadowColor: Colors.error,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
   rejectButtonText: {
-    color: "#FFFFFF",
+    color: Colors.textInverse,
     fontSize: 15,
     fontWeight: "600",
   },
   reviewerNotesContainer: {
     marginTop: 16,
     padding: 16,
-    backgroundColor: "#EEF2FF",
+    backgroundColor: Colors.indigoLight,
     borderRadius: 12,
     borderLeftWidth: 3,
-    borderLeftColor: "#6366F1",
+    borderLeftColor: Colors.indigo,
   },
   reviewerNotesHeader: {
     flexDirection: "row",
@@ -603,14 +617,14 @@ const styles = StyleSheet.create({
   },
   reviewerNotesLabel: {
     fontSize: 13,
-    color: "#6366F1",
+    color: Colors.indigo,
     fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   reviewerNotesText: {
     fontSize: 14,
-    color: "#334155",
+    color: Colors.gray700,
     lineHeight: 20,
   },
   loadingContainer: {
@@ -628,12 +642,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#64748B",
+    color: Colors.gray500,
     textAlign: "center",
   },
   emptySubtext: {
     fontSize: 14,
-    color: "#94A3B8",
+    color: Colors.textTertiary,
     textAlign: "center",
   },
 });

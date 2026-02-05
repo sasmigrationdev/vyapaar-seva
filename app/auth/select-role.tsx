@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Text } from '@/components/ui/Text';
-import { Colors, Shadows } from '@/constants/theme';
+import { Colors, Shadows, Gradients } from '@/constants/theme';
 import { useAlert } from '@/hooks/useAlert';
 import { supabase } from '@/lib/supabase/client';
 import { employerMutations } from '@/lib/api/mutations/employer.mutations';
@@ -121,7 +121,7 @@ export default function SelectRoleScreen() {
 
       {/* Gradient Header */}
       <LinearGradient
-        colors={['#E67300', '#FF9933', '#FFB366']}
+        colors={Gradients.saffronHero}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.headerGradient}
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: Colors.textInverse,
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.background,
     borderRadius: 20,
     padding: 28,
     borderWidth: 1,
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
   },
   typeButton: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: Colors.backgroundSecondary,
     borderWidth: 1.5,
     borderColor: 'rgba(0,0,0,0.06)',
     borderRadius: 16,
@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,0,0,0.08)',
     borderRadius: 14,
     marginBottom: 16,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: Colors.backgroundSecondary,
     paddingHorizontal: 16,
   },
   inputIcon: {
@@ -449,7 +449,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: Colors.textInverse,
     fontSize: 16,
     fontWeight: '700',
   },

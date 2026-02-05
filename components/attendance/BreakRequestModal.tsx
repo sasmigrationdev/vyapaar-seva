@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   Modal,
   ScrollView,
@@ -11,6 +10,7 @@ import {
   Platform,
   TextInput,
 } from 'react-native';
+import { Text } from '@/components/ui/Text';
 import { useAlert } from '@/hooks/useAlert';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AttendanceRecord } from '@/lib/types';
@@ -18,6 +18,14 @@ import { useCreateBreakRequest } from '@/hooks/mutations/useBreakRequestMutation
 import { useAuth } from '@/hooks/auth/useAuth';
 import TimePicker from '@/components/ui/TimePicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  Colors,
+  BorderRadius,
+  Spacing,
+  Shadows,
+  StatusColors,
+  Typography,
+} from '@/constants/theme';
 
 interface BreakRequestModalProps {
   visible: boolean;
@@ -35,7 +43,11 @@ export default function BreakRequestModal({
   const { success, error } = useAlert();
   const [requestedStartTime, setRequestedStartTime] = useState('');
   const [reason, setReason] = useState('');
-  
+  const [reasonTouched, setReasonTouched] = useState(false);
+
+  const MAX_REASON_LENGTH = 500;
+  const reasonError = reasonTouched && !reason.trim() ? 'Reason is required' : '';
+
   // Set default start time to current time when modal opens
   useEffect(() => {
     if (visible && !requestedStartTime) {
@@ -68,6 +80,7 @@ export default function BreakRequestModal({
       // Reset form when modal opens
       setRequestedStartTime('');
       setReason('');
+      setReasonTouched(false);
     }
   }, [visible]);
 
@@ -121,12 +134,18 @@ export default function BreakRequestModal({
           <View style={styles.modalHeader}>
             <View style={styles.headerLeft}>
               <View style={styles.headerIcon}>
-                <MaterialCommunityIcons name="coffee-outline" size={20} color="#F59E0B" />
+                <MaterialCommunityIcons name="coffee-outline" size={20} color={Colors.warning} />
               </View>
               <Text style={styles.modalTitle}>Request Break</Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="#64748B" />
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeButton}
+              accessibilityLabel="Close break request modal"
+              accessibilityRole="button"
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={24} color={Colors.gray500} />
             </TouchableOpacity>
           </View>
 
@@ -139,7 +158,7 @@ export default function BreakRequestModal({
           >
             {!canRequestBreak ? (
               <View style={styles.warningCard}>
-                <Ionicons name="alert-circle" size={20} color="#F59E0B" />
+                <Ionicons name="alert-circle" size={20} color={Colors.warning} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.warningTitle}>Check-in Required</Text>
                   <Text style={styles.warningText}>
@@ -150,8 +169,8 @@ export default function BreakRequestModal({
             ) : (
               <>
                 {/* Info Card */}
-                <View style={[styles.infoCard, { marginBottom: 16 }]}>
-                  <Ionicons name="information-circle" size={20} color="#6366F1" />
+                <View style={[styles.infoCard, { marginBottom: Spacing.lg }]}>
+                  <Ionicons name="information-circle" size={20} color={Colors.indigo} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.infoTitle}>How it works</Text>
                     <Text style={styles.infoText}>
@@ -161,48 +180,69 @@ export default function BreakRequestModal({
                 </View>
 
                 {/* Reason Field */}
-                <View style={[styles.inputGroup, { marginBottom: 16 }]}>
+                <View style={[styles.inputGroup, { marginBottom: Spacing.lg }]}>
                   <Text style={styles.label}>
                     Reason <Text style={styles.required}>*</Text>
                   </Text>
-                  <View style={[styles.inputWrapper, styles.textAreaWrapper]}>
+                  <View style={[
+                    styles.inputWrapper,
+                    styles.textAreaWrapper,
+                    reasonError && styles.inputWrapperError
+                  ]}>
                     <MaterialCommunityIcons
                       name="text"
                       size={18}
-                      color="#64748B"
+                      color={reasonError ? Colors.error : Colors.gray500}
                       style={styles.textAreaIcon}
                     />
                     <TextInput
                       style={[styles.input, styles.textArea]}
                       placeholder="Why do you need a break? (e.g., Lunch, Doctor appointment)"
                       value={reason}
-                      onChangeText={setReason}
+                      onChangeText={(text) => setReason(text.slice(0, MAX_REASON_LENGTH))}
+                      onBlur={() => setReasonTouched(true)}
                       multiline
                       numberOfLines={3}
                       textAlignVertical="top"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={Colors.textTertiary}
+                      accessibilityLabel="Break reason, required"
+                      accessibilityHint="Enter why you need a break"
                     />
+                  </View>
+                  {/* Inline validation and character counter */}
+                  <View style={styles.fieldFooter}>
+                    {reasonError ? (
+                      <Text style={styles.errorText}>{reasonError}</Text>
+                    ) : (
+                      <View />
+                    )}
+                    <Text style={[
+                      styles.charCount,
+                      reason.length >= MAX_REASON_LENGTH * 0.9 && styles.charCountWarning
+                    ]}>
+                      {reason.length}/{MAX_REASON_LENGTH}
+                    </Text>
                   </View>
                 </View>
 
                 {/* Break Start Time */}
-                <View style={{ marginBottom: 16 }}>
+                <View style={{ marginBottom: Spacing.lg }}>
                   <TimePicker
                     value={requestedStartTime}
                     onChange={setRequestedStartTime}
                     label="Break Start Time"
                     required
                     iconName="play-circle-outline"
-                    iconColor="#10B981"
+                    iconColor={Colors.success}
                   />
                 </View>
 
                 {/* Info about ending break */}
-                <View style={[styles.infoCard, { marginBottom: 16, backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
-                  <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                <View style={[styles.infoCard, { marginBottom: Spacing.lg, backgroundColor: StatusColors.approved.background, borderColor: StatusColors.approved.border }]}>
+                  <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.infoTitle, { color: '#047857' }]}>Ending Your Break</Text>
-                    <Text style={[styles.infoText, { color: '#065F46' }]}>
+                    <Text style={[styles.infoTitle, { color: StatusColors.approved.text }]}>Ending Your Break</Text>
+                    <Text style={[styles.infoText, { color: StatusColors.approved.text }]}>
                       End your break with WiFi verification. End time recorded automatically.
                     </Text>
                   </View>
@@ -218,6 +258,8 @@ export default function BreakRequestModal({
                 style={[styles.footerButton, styles.cancelFooterButton]}
                 onPress={onClose}
                 activeOpacity={0.8}
+                accessibilityLabel="Cancel"
+                accessibilityRole="button"
               >
                 <Text style={styles.cancelFooterButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -232,12 +274,15 @@ export default function BreakRequestModal({
                 onPress={handleSubmit}
                 disabled={!reason.trim() || !requestedStartTime || createBreakRequestMutation.isPending}
                 activeOpacity={0.8}
+                accessibilityLabel={createBreakRequestMutation.isPending ? "Submitting request" : "Submit break request"}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !reason.trim() || !requestedStartTime || createBreakRequestMutation.isPending }}
               >
                 {createBreakRequestMutation.isPending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={Colors.textInverse} />
                 ) : (
                   <>
-                    <Ionicons name="paper-plane" size={18} color="#FFFFFF" />
+                    <Ionicons name="paper-plane" size={18} color={Colors.textInverse} />
                     <Text style={styles.submitFooterButtonText}>Submit Request</Text>
                   </>
                 )}
@@ -257,44 +302,44 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: Colors.background,
+    borderTopLeftRadius: BorderRadius["3xl"],
+    borderTopRightRadius: BorderRadius["3xl"],
     height: '85%',
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: Colors.border,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: Spacing.sm,
     flex: 1,
   },
   headerIcon: {
     width: 36,
     height: 36,
-    borderRadius: 10,
-    backgroundColor: '#FEF3C7',
+    borderRadius: BorderRadius.lg,
+    backgroundColor: StatusColors.pending.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.text,
   },
   closeButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: Colors.gray100,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -302,44 +347,44 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalContentContainer: {
-    padding: 20,
+    padding: Spacing.xl,
     flexGrow: 1,
   },
   infoCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
-    backgroundColor: '#EEF2FF',
-    padding: 14,
-    borderRadius: 12,
+    gap: Spacing.md,
+    backgroundColor: Colors.indigoLight,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
     borderColor: '#C7D2FE',
   },
   infoTitle: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
     color: '#4338CA',
-    marginBottom: 4,
+    marginBottom: Spacing.xs,
   },
   infoText: {
     fontSize: 13,
-    color: '#4F46E5',
+    color: Colors.indigo,
     lineHeight: 18,
   },
   warningCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#FEF3C7',
-    padding: 14,
-    borderRadius: 12,
+    gap: Spacing.md,
+    backgroundColor: StatusColors.pending.background,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: StatusColors.pending.border,
   },
   warningTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#92400E',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
+    color: StatusColors.pending.text,
     marginBottom: 2,
   },
   warningText: {
@@ -348,31 +393,53 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   inputGroup: {
-    gap: 8,
+    gap: Spacing.sm,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#334155',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.gray700,
   },
   required: {
-    color: '#EF4444',
+    color: Colors.error,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 10,
+    borderColor: Colors.border,
+    gap: Spacing.sm,
+  },
+  inputWrapperError: {
+    borderColor: Colors.error,
+    borderWidth: 2,
+  },
+  fieldFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Spacing.xs,
+  },
+  errorText: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.error,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  charCount: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textTertiary,
+  },
+  charCountWarning: {
+    color: Colors.warning,
   },
   input: {
     flex: 1,
-    fontSize: 14,
-    color: '#0F172A',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.text,
   },
   textAreaWrapper: {
     alignItems: 'flex-start',
@@ -388,95 +455,95 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F8FAFC',
-    padding: 14,
-    borderRadius: 12,
+    backgroundColor: Colors.backgroundSecondary,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
   },
   toggleLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: Spacing.md,
     flex: 1,
   },
   toggleTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#64748B',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.gray500,
   },
   toggleTitleActive: {
-    color: '#6366F1',
+    color: Colors.indigo,
   },
   toggleSubtitle: {
-    fontSize: 12,
-    color: '#94A3B8',
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textTertiary,
     marginTop: 2,
   },
   toggleIndicator: {
     width: 24,
     height: 24,
-    borderRadius: 6,
+    borderRadius: BorderRadius.xs,
     borderWidth: 2,
-    borderColor: '#CBD5E1',
+    borderColor: Colors.gray300,
     justifyContent: 'center',
     alignItems: 'center',
   },
   toggleIndicatorActive: {
-    backgroundColor: '#6366F1',
-    borderColor: '#6366F1',
+    backgroundColor: Colors.indigo,
+    borderColor: Colors.indigo,
   },
   durationPreview: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
-    padding: 12,
-    borderRadius: 10,
-    gap: 8,
+    backgroundColor: Colors.indigoLight,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    gap: Spacing.sm,
     borderWidth: 1,
     borderColor: '#C7D2FE',
   },
   durationLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#64748B',
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.gray500,
   },
   durationValue: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#6366F1',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.indigo,
     flex: 1,
   },
   footer: {
     flexDirection: 'row',
-    padding: 16,
+    padding: Spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    gap: 12,
-    backgroundColor: '#FFFFFF',
+    borderTopColor: Colors.border,
+    gap: Spacing.md,
+    backgroundColor: Colors.background,
   },
   footerButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 6,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    gap: Spacing.xs,
   },
   cancelFooterButton: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: Colors.gray100,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
   },
   cancelFooterButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#64748B',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.gray500,
   },
   submitFooterButton: {
-    backgroundColor: '#6366F1',
-    shadowColor: '#6366F1',
+    backgroundColor: Colors.indigo,
+    shadowColor: Colors.indigo,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -486,8 +553,8 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   submitFooterButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.textInverse,
   },
 });

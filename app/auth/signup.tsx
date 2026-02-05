@@ -19,7 +19,7 @@ import {
 import { useAlert } from "@/hooks/useAlert";
 import { LinearGradient } from "expo-linear-gradient";
 import { Text } from "@/components/ui/Text";
-import { Colors, BorderRadius, Shadows, Spacing } from "@/constants/theme";
+import { Colors, BorderRadius, Shadows, Spacing, Gradients } from "@/constants/theme";
 import { GoogleSignInButton } from "@/components/ui/GoogleSignInButton";
 import { IS_GOOGLE_CONFIGURED } from "@/hooks/auth/useGoogleAuth";
 
@@ -35,6 +35,7 @@ export default function SignupScreen() {
     fullName: "",
     phone: "",
   });
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const employerSignUpMutation = useSignUpAsEmployer({
     onSuccess: (data) => {
@@ -123,7 +124,7 @@ export default function SignupScreen() {
 
       {/* Gradient Header */}
       <LinearGradient
-        colors={["#E67300", "#FF9933", "#FFB366"]}
+        colors={Gradients.saffronHero}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.headerGradient}
@@ -131,6 +132,9 @@ export default function SignupScreen() {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
@@ -174,6 +178,10 @@ export default function SignupScreen() {
                     ]}
                     onPress={() => setUserType("employee")}
                     disabled={isLoading}
+                    accessibilityLabel="Sign up as an Employee"
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: userType === "employee", disabled: isLoading }}
+                    accessibilityHint="Join an organization as an employee"
                   >
                     <MaterialCommunityIcons
                       name="account"
@@ -209,6 +217,10 @@ export default function SignupScreen() {
                     ]}
                     onPress={() => setUserType("employer")}
                     disabled={isLoading}
+                    accessibilityLabel="Sign up as an Employer"
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: userType === "employer", disabled: isLoading }}
+                    accessibilityHint="Register your business as an employer"
                   >
                     <MaterialCommunityIcons
                       name="office-building"
@@ -256,11 +268,11 @@ export default function SignupScreen() {
               )}
 
               {/* Common fields */}
-              <View style={styles.inputContainer}>
+              <View style={[styles.inputContainer, focusedField === 'fullName' && styles.inputContainerFocused]}>
                 <MaterialCommunityIcons
                   name="account-outline"
                   size={20}
-                  color={Colors.primary}
+                  color={focusedField === 'fullName' ? Colors.primary : Colors.gray400}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -270,14 +282,18 @@ export default function SignupScreen() {
                   value={formData.fullName}
                   onChangeText={(value) => updateField("fullName", value)}
                   editable={!isLoading}
+                  onFocus={() => setFocusedField('fullName')}
+                  onBlur={() => setFocusedField(null)}
+                  accessibilityLabel="Full name, required"
+                  accessibilityHint="Enter your full name"
                 />
               </View>
 
-              <View style={styles.inputContainer}>
+              <View style={[styles.inputContainer, focusedField === 'email' && styles.inputContainerFocused]}>
                 <MaterialCommunityIcons
                   name="email-outline"
                   size={20}
-                  color={Colors.primary}
+                  color={focusedField === 'email' ? Colors.primary : Colors.gray400}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -289,16 +305,20 @@ export default function SignupScreen() {
                   autoCapitalize="none"
                   keyboardType="email-address"
                   editable={!isLoading}
+                  onFocus={() => setFocusedField('email')}
+                  onBlur={() => setFocusedField(null)}
+                  accessibilityLabel="Email address, required"
+                  accessibilityHint="Enter your email address"
                 />
               </View>
 
               {/* Employee-specific fields */}
               {userType === "employee" && (
-                <View style={styles.inputContainer}>
+                <View style={[styles.inputContainer, focusedField === 'phone' && styles.inputContainerFocused]}>
                   <MaterialCommunityIcons
                     name="phone-outline"
                     size={20}
-                    color={Colors.primary}
+                    color={focusedField === 'phone' ? Colors.primary : Colors.gray400}
                     style={styles.inputIcon}
                   />
                   <TextInput
@@ -309,15 +329,19 @@ export default function SignupScreen() {
                     onChangeText={(value) => updateField("phone", value)}
                     keyboardType="phone-pad"
                     editable={!isLoading}
+                    onFocus={() => setFocusedField('phone')}
+                    onBlur={() => setFocusedField(null)}
+                    accessibilityLabel="Phone number, optional"
+                    accessibilityHint="Enter your phone number"
                   />
                 </View>
               )}
 
-              <View style={styles.inputContainer}>
+              <View style={[styles.inputContainer, focusedField === 'password' && styles.inputContainerFocused]}>
                 <MaterialCommunityIcons
                   name="lock-outline"
                   size={20}
-                  color={Colors.primary}
+                  color={focusedField === 'password' ? Colors.primary : Colors.gray400}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -328,14 +352,18 @@ export default function SignupScreen() {
                   onChangeText={(value) => updateField("password", value)}
                   secureTextEntry
                   editable={!isLoading}
+                  onFocus={() => setFocusedField('password')}
+                  onBlur={() => setFocusedField(null)}
+                  accessibilityLabel="Password, required"
+                  accessibilityHint="Create a secure password"
                 />
               </View>
 
-              <View style={styles.inputContainer}>
+              <View style={[styles.inputContainer, focusedField === 'confirmPassword' && styles.inputContainerFocused]}>
                 <MaterialCommunityIcons
                   name="lock-check-outline"
                   size={20}
-                  color={Colors.primary}
+                  color={focusedField === 'confirmPassword' ? Colors.primary : Colors.gray400}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -346,6 +374,10 @@ export default function SignupScreen() {
                   onChangeText={(value) => updateField("confirmPassword", value)}
                   secureTextEntry
                   editable={!isLoading}
+                  onFocus={() => setFocusedField('confirmPassword')}
+                  onBlur={() => setFocusedField(null)}
+                  accessibilityLabel="Confirm password, required"
+                  accessibilityHint="Re-enter your password to confirm"
                 />
               </View>
 
@@ -441,7 +473,7 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: Colors.textInverse,
     textShadowColor: "rgba(0, 0, 0, 0.2)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
@@ -455,7 +487,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: Colors.background,
     borderRadius: 20,
     padding: 28,
     borderWidth: 1,
@@ -495,7 +527,7 @@ const styles = StyleSheet.create({
   },
   typeButton: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: Colors.backgroundSecondary,
     borderWidth: 1.5,
     borderColor: "rgba(0,0,0,0.06)",
     borderRadius: 16,
@@ -535,12 +567,16 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: "rgba(0,0,0,0.08)",
     borderRadius: 14,
     marginBottom: 16,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: Colors.backgroundSecondary,
     paddingHorizontal: 16,
+  },
+  inputContainerFocused: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.background,
   },
   inputIcon: {
     marginRight: 12,
@@ -554,14 +590,14 @@ const styles = StyleSheet.create({
   },
   infoBox: {
     flexDirection: "row",
-    backgroundColor: "rgba(255, 153, 51, 0.06)",
+    backgroundColor: "rgba(255, 153, 51, 0.12)",
     borderRadius: 14,
     padding: 16,
     marginBottom: 16,
     gap: 12,
     alignItems: "flex-start",
     borderWidth: 1,
-    borderColor: "rgba(255, 153, 51, 0.12)",
+    borderColor: "rgba(255, 153, 51, 0.25)",
   },
   infoText: {
     flex: 1,
@@ -583,7 +619,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    color: "#FFFFFF",
+    color: Colors.textInverse,
     fontSize: 16,
     fontWeight: "700",
   },

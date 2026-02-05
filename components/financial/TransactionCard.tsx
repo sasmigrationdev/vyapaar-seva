@@ -1,6 +1,8 @@
+import React, { useRef } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Animated, Pressable } from 'react-native';
 import { Text } from '@/components/ui/Text';
+import { Colors, PressOpacity, Spacing, BorderRadius, AnimationPresets } from '@/constants/theme';
 import { FinancialTransaction } from '@/lib/types/financial.types';
 
 interface TransactionCardProps {
@@ -8,7 +10,9 @@ interface TransactionCardProps {
   onPress?: () => void;
 }
 
-export default function TransactionCard({ transaction, onPress }: TransactionCardProps) {
+function TransactionCard({ transaction, onPress }: TransactionCardProps) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -26,59 +30,100 @@ export default function TransactionCard({ transaction, onPress }: TransactionCar
     }).format(date);
   };
 
+  const handlePressIn = () => {
+    if (!onPress) return;
+    Animated.spring(scaleAnim, {
+      toValue: AnimationPresets.pressScale,
+      damping: AnimationPresets.springConfig.damping,
+      stiffness: AnimationPresets.springConfig.stiffness,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    if (!onPress) return;
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      damping: AnimationPresets.springConfig.damping,
+      stiffness: AnimationPresets.springConfig.stiffness,
+      useNativeDriver: true,
+    }).start();
+  };
+
   const isIncome = transaction.type === 'income';
 
-  return (
-    <TouchableOpacity
-      style={styles.container}
-      onPress={onPress}
-      disabled={!onPress}
-      activeOpacity={0.7}
-    >
-      <View style={styles.content}>
-        <View style={[styles.iconContainer, isIncome ? styles.incomeIcon : styles.expenseIcon]}>
-          <MaterialCommunityIcons
-            name={isIncome ? 'arrow-down' : 'arrow-up'}
-            size={20}
-            color={isIncome ? '#10B981' : '#EF4444'}
-          />
-        </View>
-
-        <View style={styles.details}>
-          <Text style={styles.description} numberOfLines={1}>
-            {transaction.description || transaction.category?.name || 'Transaction'}
-          </Text>
-          <View style={styles.meta}>
-            <Text style={styles.date} numberOfLines={1}>{formatDate(transaction.transaction_date)}</Text>
-            {transaction.category && (
-              <>
-                <Text style={styles.separator}>•</Text>
-                <Text style={styles.category} numberOfLines={1}>{transaction.category.name}</Text>
-              </>
-            )}
-          </View>
-        </View>
-
-        <Text style={[styles.amount, isIncome ? styles.incomeAmount : styles.expenseAmount]} numberOfLines={1}>
-          {isIncome ? '+' : '-'} {formatCurrency(transaction.amount)}
-        </Text>
+  const content = (
+    <View style={styles.content}>
+      <View style={[styles.iconContainer, isIncome ? styles.incomeIcon : styles.expenseIcon]}>
+        <MaterialCommunityIcons
+          name={isIncome ? 'arrow-down' : 'arrow-up'}
+          size={20}
+          color={isIncome ? Colors.success : Colors.error}
+        />
       </View>
-    </TouchableOpacity>
+
+      <View style={styles.details}>
+        <Text style={styles.description} numberOfLines={1}>
+          {transaction.description || transaction.category?.name || 'Transaction'}
+        </Text>
+        <View style={styles.meta}>
+          <Text style={styles.date} numberOfLines={1}>{formatDate(transaction.transaction_date)}</Text>
+          {transaction.category && (
+            <>
+              <Text style={styles.separator}>•</Text>
+              <Text style={styles.category} numberOfLines={1}>{transaction.category.name}</Text>
+            </>
+          )}
+        </View>
+      </View>
+
+      <Text style={[styles.amount, isIncome ? styles.incomeAmount : styles.expenseAmount]} numberOfLines={1}>
+        {isIncome ? '+' : '-'} {formatCurrency(transaction.amount)}
+      </Text>
+    </View>
+  );
+
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        accessibilityRole="button"
+        accessibilityLabel={`${transaction.type === 'income' ? 'Income' : 'Expense'}: ${transaction.description || transaction.category?.name || 'Transaction'}`}
+      >
+        <Animated.View style={[styles.container, { transform: [{ scale: scaleAnim }] }]}>
+          {content}
+        </Animated.View>
+      </Pressable>
+    );
+  }
+
+  return (
+    <View
+      style={styles.container}
+      accessibilityLabel={`${transaction.type === 'income' ? 'Income' : 'Expense'}: ${transaction.description || transaction.category?.name || 'Transaction'}`}
+    >
+      {content}
+    </View>
   );
 }
 
+// Export memoized component for performance
+export default React.memo(TransactionCard);
+
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: 14,
+    borderColor: Colors.border,
+    padding: Spacing.md + 2,
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: Spacing.md,
   },
   iconContainer: {
     width: 40,
@@ -88,10 +133,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   incomeIcon: {
-    backgroundColor: '#D1FAE5',
+    backgroundColor: Colors.successLight,
   },
   expenseIcon: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: Colors.errorLight,
   },
   details: {
     flex: 1,
@@ -101,7 +146,7 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#0F172A',
+    color: Colors.text,
   },
   meta: {
     flexDirection: 'row',
@@ -111,29 +156,29 @@ const styles = StyleSheet.create({
   },
   date: {
     fontSize: 13,
-    color: '#64748B',
+    color: Colors.textSecondary,
     flexShrink: 0,
   },
   separator: {
     fontSize: 13,
-    color: '#CBD5E1',
+    color: Colors.gray300,
     flexShrink: 0,
   },
   category: {
     fontSize: 13,
-    color: '#64748B',
+    color: Colors.textSecondary,
     flex: 1,
   },
   amount: {
     fontSize: 16,
     fontWeight: '700',
     flexShrink: 0,
-    marginLeft: 8,
+    marginLeft: Spacing.sm,
   },
   incomeAmount: {
-    color: '#10B981',
+    color: Colors.success,
   },
   expenseAmount: {
-    color: '#EF4444',
+    color: Colors.error,
   },
 });

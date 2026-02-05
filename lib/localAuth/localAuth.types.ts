@@ -45,6 +45,6 @@ export interface LocalAuthContextValue extends LocalAuthState {
 }
 
 export const DEFAULT_LOCAL_AUTH_SETTINGS: LocalAuthSettings = {
-  enabled: true, // App lock enabled by default for security
+  enabled: false, // Disabled by default - users can enable in settings
   preferBiometric: true,
 };

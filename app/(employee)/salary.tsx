@@ -5,9 +5,11 @@ import { Text } from '@/components/ui/Text';
 import { useAuth } from '@/hooks/auth/useAuth';
 import { useCurrentMonthEarnings } from '@/hooks/queries/useEarnings';
 import { formatCurrency } from '@/lib/utils/salary.utils';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '@/constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows, Gradients } from '@/constants/theme';
 import MonthlySlipsList from '@/components/salary/MonthlySlipsList';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 
 export default function SalaryScreen() {
   const insets = useSafeAreaInsets();
@@ -46,15 +48,26 @@ export default function SalaryScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      {/* Modern Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+      {/* Modern Gradient Header */}
+      <LinearGradient
+        colors={Gradients.saffronHero}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.header, { paddingTop: insets.top + 16 }]}
+      >
         <View style={styles.headerContent}>
           <View>
             <Text style={styles.headerTitle}>My Salary</Text>
-            <Text style={styles.headerSubtitle}>{currentMonth}</Text>
+            <View style={styles.headerDatePill}>
+              <MaterialCommunityIcons name="calendar-month" size={14} color={Colors.textInverse} />
+              <Text style={styles.headerSubtitle}>{currentMonth}</Text>
+            </View>
+          </View>
+          <View style={styles.headerIcon}>
+            <MaterialCommunityIcons name="wallet" size={28} color="rgba(255,255,255,0.9)" />
           </View>
         </View>
-      </View>
+      </LinearGradient>
 
       <ScrollView
         style={styles.scrollView}
@@ -66,7 +79,7 @@ export default function SalaryScreen() {
         <View style={styles.content}>
 
       {/* Salary Overview */}
-      <View style={styles.groupedList}>
+      <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.groupedList}>
         <View style={styles.salaryItem}>
           <View style={styles.salaryItemLeft}>
             <MaterialCommunityIcons name="cash-multiple" size={24} color={Colors.primary} />
@@ -147,24 +160,24 @@ export default function SalaryScreen() {
             )}
           </View>
         </View>
-      </View>
+      </Animated.View>
 
       {/* Info Note */}
-      <View style={styles.infoBox}>
+      <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.infoBox}>
         <Ionicons name="information-circle-outline" size={20} color={Colors.info} />
         <Text style={styles.infoText}>
           Your earned salary is calculated based on hours worked and your hourly rate. The final
           salary will be processed at the end of the month.
         </Text>
-      </View>
+      </Animated.View>
 
       {/* Salary Slips Section */}
-      <View style={styles.salarySlipsSection}>
+      <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.salarySlipsSection}>
         <Text style={styles.sectionTitle}>My Salary Slips</Text>
         <View style={styles.salarySlipsContainer}>
           <MonthlySlipsList userId={userId} />
         </View>
-      </View>
+      </Animated.View>
         </View>
       </ScrollView>
     </View>
@@ -183,31 +196,52 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    backgroundColor: Colors.primary,
     paddingBottom: Spacing['xl'],
-    borderBottomLeftRadius: BorderRadius['2xl'],
-    borderBottomRightRadius: BorderRadius['2xl'],
+    borderBottomLeftRadius: BorderRadius['3xl'],
+    borderBottomRightRadius: BorderRadius['3xl'],
     ...Shadows.lg,
   },
   headerContent: {
     paddingHorizontal: Spacing['xl'],
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: Typography.fontSize['2xl'],
     fontWeight: Typography.fontWeight.bold,
     color: Colors.textInverse,
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.sm,
+    letterSpacing: -0.5,
+  },
+  headerDatePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: Spacing.xs,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
   },
   headerSubtitle: {
     fontSize: Typography.fontSize.sm,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontWeight: Typography.fontWeight.medium,
+    color: Colors.textInverse,
+    fontWeight: Typography.fontWeight.semibold,
+  },
+  headerIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: BorderRadius.xl,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollView: {
     flex: 1,
   },
   content: {
-    padding: Spacing['lg'],
+    padding: Spacing['xl'],
     paddingBottom: 120,
   },
   groupedList: {
@@ -311,9 +345,8 @@ const styles = StyleSheet.create({
   infoBox: {
     flexDirection: 'row',
     backgroundColor: Colors.info + '10',
-    marginHorizontal: Spacing.lg,
     marginTop: Spacing.lg,
-    marginBottom: Spacing['2xl'],
+    marginBottom: Spacing.lg,
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
@@ -327,8 +360,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   salarySlipsSection: {
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.lg,
+    marginTop: Spacing.md,
     marginBottom: Spacing['2xl'],
   },
   sectionTitle: {

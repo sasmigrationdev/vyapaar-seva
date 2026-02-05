@@ -1,21 +1,23 @@
-import { Text } from "@/components/ui/Text";
-import { TeamHealthScoreCard } from "@/components/ui/TeamHealthScore";
-import QuickActionsGrid from "@/components/ui/QuickActionsGrid";
 import CollapsibleSection from "@/components/ui/CollapsibleSection";
-import { GlassCardSimple } from "@/components/ui/GlassCard";
+import ComingSoonCarousel from "@/components/ui/ComingSoonCarousel";
+import { MarketingBannerCarousel } from "@/components/ui/MarketingBanner";
+import QuickActionsGrid from "@/components/ui/QuickActionsGrid";
+import TeamAttendanceDonut from "@/components/ui/TeamAttendanceDonut";
+import { Text } from "@/components/ui/Text";
+import WeeklyAttendanceChart from "@/components/ui/WeeklyAttendanceChart";
 import {
   BorderRadius,
   Colors,
-  Gradients,
+  PressOpacity,
   Shadows,
   Spacing,
-  Typography,
 } from "@/constants/theme";
 import { useAuth } from "@/hooks/auth/useAuth";
-import { useHRAllEmployeesAttendance } from "@/hooks/queries/useAttendance";
+import { useHRAllEmployeesAttendance, useWeeklyAttendanceTrend } from "@/hooks/queries/useAttendance";
 import { usePendingBreakRequests } from "@/hooks/queries/useBreakRequests";
 import { usePendingJoinRequests } from "@/hooks/queries/useEmployerRequests";
 import { useHRPendingLeaveRequests } from "@/hooks/queries/useLeave";
+import { useOrganization } from "@/hooks/queries/useOrganization";
 import { usePendingOvertimeCount } from "@/hooks/queries/useOvertimeRequests";
 import { useAllUsers } from "@/hooks/queries/useUser";
 import { useAutoRejectExpiredBreaksForOrg } from "@/hooks/useAutoRejectExpiredBreaksForOrg";
@@ -23,7 +25,7 @@ import { formatDate, formatDateToISO } from "@/lib/utils/date.utils";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Href, useRouter } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   RefreshControl,
   ScrollView,
@@ -32,6 +34,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
 
 export default function HRDashboard() {
   const router = useRouter();
@@ -39,56 +42,76 @@ export default function HRDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const today = formatDateToISO(new Date());
 
+  // Memoize filter objects to prevent React Compiler cache size issues
+  const organizationId = user?.organization_id || "";
+
+  const attendanceFilters = useMemo(
+    () => ({ date: today, organizationId }),
+    [today, organizationId]
+  );
+
+  const usersFilters = useMemo(
+    () => ({ organizationId }),
+    [organizationId]
+  );
+
   // Queries
   const {
     data: todayAttendance,
     isLoading: loadingAttendance,
     isFetching: isFetchingAttendance,
+    error: attendanceError,
     refetch: refetchAttendance,
-  } = useHRAllEmployeesAttendance({
-    date: today,
-    organizationId: user?.organization_id || "",
-  });
+  } = useHRAllEmployeesAttendance(attendanceFilters);
 
   const {
     data: pendingLeaves,
     isLoading: loadingLeaves,
     isFetching: isFetchingLeaves,
     refetch: refetchLeaves,
-  } = useHRPendingLeaveRequests(user?.organization_id || "");
+  } = useHRPendingLeaveRequests(organizationId);
 
   const {
     data: pendingBreakRequests,
     isLoading: loadingBreakRequests,
     isFetching: isFetchingBreakRequests,
     refetch: refetchBreakRequests,
-  } = usePendingBreakRequests(user?.organization_id || "");
+  } = usePendingBreakRequests(organizationId);
 
   const {
     data: pendingJoinRequests,
     isLoading: loadingJoinRequests,
     isFetching: isFetchingJoinRequests,
     refetch: refetchJoinRequests,
-  } = usePendingJoinRequests(user?.organization_id || "");
+  } = usePendingJoinRequests(organizationId);
 
   const {
     data: pendingOvertimeCount,
     isLoading: loadingOvertimeRequests,
     isFetching: isFetchingOvertimeRequests,
     refetch: refetchOvertimeRequests,
-  } = usePendingOvertimeCount(user?.organization_id || "");
+  } = usePendingOvertimeCount(organizationId);
 
   const {
     data: allUsers,
     isLoading: loadingUsers,
     isFetching: isFetchingUsers,
+    error: usersError,
     refetch: refetchUsers,
-  } = useAllUsers({
-    organizationId: user?.organization_id || "",
-  });
+  } = useAllUsers(usersFilters);
+
+  // Get organization details for name
+  const { data: organization } = useOrganization(organizationId);
+
+  // Weekly attendance trend for chart
+  const {
+    data: weeklyTrendData,
+    isLoading: loadingWeeklyTrend,
+    refetch: refetchWeeklyTrend,
+  } = useWeeklyAttendanceTrend(organizationId);
 
   // Auto-reject expired pending break requests
-  useAutoRejectExpiredBreaksForOrg(user?.organization_id || "", user?.id || "");
+  useAutoRejectExpiredBreaksForOrg(organizationId, user?.id || "");
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -100,6 +123,7 @@ export default function HRDashboard() {
         refetchJoinRequests(),
         refetchOvertimeRequests(),
         refetchUsers(),
+        refetchWeeklyTrend(),
       ]);
     } finally {
       setRefreshing(false);
@@ -150,28 +174,36 @@ export default function HRDashboard() {
     pendingLeavesCount + pendingBreakCount + pendingJoinCount + pendingOvertimeRequestsCount;
   const yetToCheckIn = Math.max(activeEmployees - checkedInToday, 0);
 
-  // Get time-based greeting
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good Morning";
-    if (hour < 17) return "Good Afternoon";
-    return "Good Evening";
-  };
+  // Check for any loading errors
+  const hasError = attendanceError || usersError;
 
-  // Quick Actions configuration - 2x2 grid layout
+  // Calculate absent employees for donut chart
+  const absentToday = Math.max(activeEmployees - checkedInToday, 0);
+
+  // Promotional Banners for carousel - Image-only banners (text baked into images)
+  const promotionalBanners = useMemo(
+    () => [
+      {
+        variant: "image" as const,
+        imageSource: require("@/assets/images/banner1.png"),
+        onPress: () => router.push("/(hr)/attendance"),
+        aspectRatio: 2.2,
+      },
+      {
+        variant: "image" as const,
+        imageSource: require("@/assets/images/banner2.png"),
+        onPress: () => router.push("/(hr)/salary"),
+        aspectRatio: 2.2,
+      },
+    ],
+    [router]
+  );
+
+  // Quick Actions configuration - 4x2 grid layout (8 items)
   const quickActions = [
-    {
-      id: "salary",
-      label: "Salary",
-      description: "Manage payroll",
-      icon: "wallet" as const,
-      color: Colors.warning,
-      onPress: () => router.push("/(hr)/salary"),
-    },
     {
       id: "attendance",
       label: "Attendance",
-      description: "Track team",
       icon: "clock-check-outline" as const,
       color: Colors.primary,
       onPress: () => router.push("/(hr)/attendance"),
@@ -179,15 +211,35 @@ export default function HRDashboard() {
     {
       id: "employees",
       label: "Team",
-      description: `${totalEmployees} members`,
       icon: "account-group" as const,
       color: Colors.secondary,
       onPress: () => router.push("/(hr)/employees"),
     },
     {
+      id: "leave",
+      label: "Leave",
+      icon: "palm-tree" as const,
+      color: Colors.error,
+      badge: pendingLeavesCount > 0 ? pendingLeavesCount : undefined,
+      onPress: () => router.push("/(hr)/leave"),
+    },
+    {
+      id: "salary",
+      label: "Salary",
+      icon: "wallet" as const,
+      color: Colors.warning,
+      onPress: () => router.push("/(hr)/salary"),
+    },
+    {
+      id: "payroll",
+      label: "Payroll",
+      icon: "file-document-outline" as const,
+      color: Colors.info,
+      onPress: () => router.push("/(hr)/payroll"),
+    },
+    {
       id: "cashbook",
       label: "Cashbook",
-      description: "Transactions",
       icon: "cash-register" as const,
       color: Colors.success,
       onPress: () => router.push("/(hr)/financial"),
@@ -195,10 +247,18 @@ export default function HRDashboard() {
     {
       id: "breaks",
       label: "Breaks",
-      description: "Manage breaks",
       icon: "coffee" as const,
-      color: "#0891b2",
+      color: Colors.cyan,
+      badge: pendingBreakCount > 0 ? pendingBreakCount : undefined,
       onPress: () => router.push("/(hr)/breaks"),
+    },
+    {
+      id: "overtime",
+      label: "Overtime",
+      icon: "clock-plus-outline" as const,
+      color: Colors.purple,
+      badge: pendingOvertimeRequestsCount > 0 ? pendingOvertimeRequestsCount : undefined,
+      onPress: () => router.push("/(hr)/overtime-requests" as Href),
     },
   ];
 
@@ -208,6 +268,13 @@ export default function HRDashboard() {
         barStyle="light-content"
         backgroundColor="transparent"
         translucent
+      />
+
+      {/* Background Gradient - Softer peach/apricot with elegant fade */}
+      <LinearGradient
+        colors={["#FF9933", "#FFAD5C", "#FFC896", "#FFE4D0", "#FFF5ED", "#FAFAFA"]}
+        locations={[0, 0.1, 0.25, 0.4, 0.6, 0.85]}
+        style={styles.backgroundGradient}
       />
 
       <ScrollView
@@ -223,84 +290,93 @@ export default function HRDashboard() {
           />
         }
       >
-        {/* SECTION 1: Hero Header */}
-        <LinearGradient
-          colors={Gradients.saffronHero}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.heroSection}
-        >
-          {/* Header Row */}
+        {/* SECTION 1: Hero Header - Compact single row */}
+        <View style={styles.heroSection}>
           <View style={styles.heroHeader}>
             <View style={styles.heroHeaderLeft}>
-              <Text style={styles.greetingSmall}>{getGreeting()}</Text>
-              <Text style={styles.greeting}>
-                {user?.full_name?.split(" ")[0]}
-              </Text>
+              <Text style={styles.userName}>{user?.full_name?.split(" ")[0]}</Text>
               <View style={styles.datePill}>
-                <Feather name="calendar" size={12} color="rgba(255,255,255,0.9)" />
+                <Feather name="calendar" size={13} color="rgba(0,0,0,0.5)" />
                 <Text style={styles.dateText}>{formatDate(new Date())}</Text>
               </View>
             </View>
 
-            <TouchableOpacity
-              style={styles.profileButton}
-              onPress={() => router.push("/profile")}
-            >
-              <Text style={styles.profileInitial}>
-                {user?.full_name?.charAt(0).toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
+            <View style={styles.heroHeaderRight}>
+              {/* Notification Bell */}
+              <TouchableOpacity
+                style={styles.headerIconButton}
+                onPress={() => router.push("/(hr)/leave")}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="notifications-outline" size={20} color="#1A1A1A" />
+                {totalPendingApprovals > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>
+                      {totalPendingApprovals > 9 ? "9+" : totalPendingApprovals}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
 
-        {/* SECTION 2: Team Health Score - Floating Card */}
-        <View style={styles.healthCardWrapper}>
-          <TeamHealthScoreCard
-            presentCount={checkedInToday}
-            totalCount={activeEmployees}
-            pendingCount={yetToCheckIn}
-            onPress={() => router.push("/(hr)/attendance")}
-          />
+              {/* Profile Button */}
+              <TouchableOpacity
+                style={styles.headerIconButton}
+                onPress={() => router.push("/profile")}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="person-outline" size={20} color="#1A1A1A" />
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
 
-        {/* SECTION 3: Attention Required Banner */}
-        {totalPendingApprovals > 0 && (
-          <TouchableOpacity
-            style={styles.attentionBanner}
-            onPress={() => router.push("/(hr)/leave")}
-            activeOpacity={0.8}
-          >
-            <View style={styles.attentionIconWrapper}>
-              <MaterialCommunityIcons name="alert-circle" size={22} color={Colors.warning} />
-            </View>
-            <View style={styles.attentionContent}>
-              <Text style={styles.attentionTitle}>Attention Required</Text>
-              <Text style={styles.attentionSubtitle}>
-                {pendingLeavesCount > 0 && `${pendingLeavesCount} leave`}
-                {pendingLeavesCount > 0 && pendingBreakCount > 0 && ", "}
-                {pendingBreakCount > 0 && `${pendingBreakCount} break`}
-                {(pendingLeavesCount > 0 || pendingBreakCount > 0) && pendingOvertimeRequestsCount > 0 && ", "}
-                {pendingOvertimeRequestsCount > 0 && `${pendingOvertimeRequestsCount} overtime`}
-                {(pendingLeavesCount > 0 || pendingBreakCount > 0 || pendingOvertimeRequestsCount > 0) && pendingJoinCount > 0 && ", "}
-                {pendingJoinCount > 0 && `${pendingJoinCount} join`}
-                {" requests pending"}
-              </Text>
-            </View>
-            <View style={styles.attentionBadge}>
-              <Text style={styles.attentionBadgeText}>{totalPendingApprovals}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={Colors.gray400} />
-          </TouchableOpacity>
+        {/* Error Banner */}
+        {hasError && (
+          <Animated.View entering={FadeInDown.delay(50).springify()} style={styles.errorBanner}>
+            <Ionicons name="alert-circle" size={20} color={Colors.error} />
+            <Text style={styles.errorText}>Failed to load some data</Text>
+            <TouchableOpacity
+              onPress={onRefresh}
+              activeOpacity={PressOpacity.primary}
+              accessibilityLabel="Retry loading data"
+              accessibilityRole="button"
+            >
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </Animated.View>
         )}
 
-        {/* SECTION 4: Quick Actions Grid */}
-        <View style={styles.quickActionsWrapper}>
-          <QuickActionsGrid actions={quickActions} columns={2} />
-        </View>
+        {/* SECTION 2: Team Attendance Donut - Premium Dashboard Card */}
+        <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.healthCardWrapper}>
+          <TeamAttendanceDonut
+            present={checkedInToday}
+            absent={absentToday}
+            onLeave={0}
+            total={activeEmployees}
+            organizationName={organization?.name}
+            totalTeam={totalEmployees}
+            pendingLeave={pendingLeavesCount}
+            pendingBreak={pendingBreakCount}
+            pendingOvertime={pendingOvertimeRequestsCount}
+          />
+        </Animated.View>
+
+          {/* SECTION 5: Quick Actions Grid - 4x2 */}
+          <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.quickActionsWrapper}>
+          <QuickActionsGrid actions={quickActions} columns={4} />
+        </Animated.View>
+
+        {/* Promotional Banners Carousel - Auto-rotating */}
+        <Animated.View entering={FadeInDown.delay(250).springify()} style={styles.bannerWrapper}>
+          <MarketingBannerCarousel
+            banners={promotionalBanners}
+            autoScroll={true}
+            interval={5000}
+          />
+        </Animated.View>
 
         {/* SECTION 3: Pending Actions (Collapsible) */}
-        <View style={styles.sectionWrapper}>
+        <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.sectionWrapper}>
           <CollapsibleSection
             title="Pending Actions"
             badge={
@@ -450,92 +526,21 @@ export default function HRDashboard() {
               </TouchableOpacity>
             </View>
           </CollapsibleSection>
-        </View>
+        </Animated.View>
 
-        {/* SECTION 4: Team Overview (Collapsible) */}
-        <View style={styles.sectionWrapper}>
-          <CollapsibleSection
-            title="Team Overview"
-            subtitle={`${totalEmployees} total members`}
-            icon="people-outline"
-            iconColor={Colors.primary}
-            defaultExpanded={false}
-          >
-            <View style={styles.teamStatsGrid}>
-              <TouchableOpacity
-                style={styles.teamStatItem}
-                onPress={() => router.push("/(hr)/employees")}
-                activeOpacity={0.7}
-              >
-                <View
-                  style={[
-                    styles.teamStatIcon,
-                    { backgroundColor: Colors.primary + "20" },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name="account-multiple"
-                    size={20}
-                    color={Colors.primary}
-                  />
-                </View>
-                <Text style={styles.teamStatValue}>{totalEmployees}</Text>
-                <Text style={styles.teamStatLabel}>Total</Text>
-              </TouchableOpacity>
+        {/* SECTION 4: Weekly Attendance Chart */}
+        <Animated.View entering={FadeInDown.delay(500).springify()} style={styles.sectionWrapper}>
+          <WeeklyAttendanceChart
+            data={weeklyTrendData || []}
+            isLoading={loadingWeeklyTrend}
+            totalEmployees={activeEmployees}
+          />
+        </Animated.View>
 
-              <View style={styles.teamStatItem}>
-                <View
-                  style={[
-                    styles.teamStatIcon,
-                    { backgroundColor: Colors.success + "20" },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name="account-check"
-                    size={20}
-                    color={Colors.success}
-                  />
-                </View>
-                <Text style={styles.teamStatValue}>{activeEmployees}</Text>
-                <Text style={styles.teamStatLabel}>Active</Text>
-              </View>
-
-              <View style={styles.teamStatItem}>
-                <View
-                  style={[
-                    styles.teamStatIcon,
-                    { backgroundColor: Colors.accent + "20" },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name="shield-account"
-                    size={20}
-                    color={Colors.accent}
-                  />
-                </View>
-                <Text style={styles.teamStatValue}>{leadershipCount}</Text>
-                <Text style={styles.teamStatLabel}>HR/Admin</Text>
-              </View>
-
-              <View style={styles.teamStatItem}>
-                <View
-                  style={[
-                    styles.teamStatIcon,
-                    { backgroundColor: Colors.error + "20" },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name="account-off"
-                    size={20}
-                    color={Colors.error}
-                  />
-                </View>
-                <Text style={styles.teamStatValue}>{inactiveCount}</Text>
-                <Text style={styles.teamStatLabel}>Inactive</Text>
-              </View>
-            </View>
-          </CollapsibleSection>
-        </View>
+        {/* SECTION 5: Coming Soon Features */}
+        <Animated.View entering={FadeInDown.delay(600).springify()}>
+          <ComingSoonCarousel />
+        </Animated.View>
       </ScrollView>
     </View>
   );
@@ -546,220 +551,179 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.gray50,
   },
+  backgroundGradient: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 400,
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingBottom: 120,
-    gap: Spacing.lg,
+    gap: Spacing.md,
   },
 
-  // Hero Section - Compact header
+  // Hero Section - Minimal header row
   heroSection: {
-    paddingTop: Spacing["6xl"],
-    paddingBottom: Spacing["3xl"],
+    paddingTop: Spacing["6xl"] + Spacing.lg,
+    paddingBottom: Spacing["2xl"],
     paddingHorizontal: Spacing.xl,
+    backgroundColor: "transparent",
   },
   heroHeader: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "flex-start",
   },
   heroHeaderLeft: {
-    gap: Spacing.xs,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
   },
-  greetingSmall: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "rgba(255,255,255,0.8)",
-    letterSpacing: 0.5,
-  },
-  greeting: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    letterSpacing: -1,
+  userName: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1A1A1A",
+    letterSpacing: -0.5,
   },
   datePill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: BorderRadius.full,
-    alignSelf: "flex-start",
-    marginTop: Spacing.xs,
+    gap: 5,
   },
   dateText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "rgba(255,255,255,0.9)",
+    fontSize: 13,
+    fontWeight: "500",
+    color: "rgba(0,0,0,0.5)",
   },
-  profileButton: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.xl,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  profileInitial: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
-
-  // Health Card - Floating with negative margin
-  healthCardWrapper: {
-    marginTop: -Spacing["2xl"],
-    paddingHorizontal: Spacing.lg,
-  },
-
-  // Attention Banner
-  attentionBanner: {
+  heroHeaderRight: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFBEB",
-    marginHorizontal: Spacing.lg,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-    borderColor: "#FDE68A",
-    gap: Spacing.md,
+    gap: 8,
   },
-  attentionIconWrapper: {
+  headerIconButton: {
     width: 40,
     height: 40,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: "#FEF3C7",
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.7)",
     justifyContent: "center",
     alignItems: "center",
   },
-  attentionContent: {
-    flex: 1,
-    gap: 2,
-  },
-  attentionTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#92400E",
-  },
-  attentionSubtitle: {
-    fontSize: 12,
-    fontWeight: "500",
-    color: "#B45309",
-  },
-  attentionBadge: {
-    backgroundColor: Colors.warning,
-    minWidth: 26,
-    height: 26,
-    borderRadius: 13,
+  notificationBadge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: Colors.error,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 6,
+    paddingHorizontal: 3,
   },
-  attentionBadgeText: {
-    fontSize: 13,
+  notificationBadgeText: {
+    fontSize: 9,
     fontWeight: "700",
     color: "#FFFFFF",
+  },
+
+  // Error Banner
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEE2E2",
+    marginHorizontal: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    gap: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.error + "30",
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#991B1B",
+  },
+  retryText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.error,
+  },
+
+  // Health Card - Clean card below gradient fade
+  healthCardWrapper: {
+    paddingHorizontal: Spacing.xl,
   },
 
   // Quick Actions
   quickActionsWrapper: {
-    marginTop: Spacing.sm,
+    marginTop: 0,
+  },
+
+  // Banner Wrapper
+  bannerWrapper: {
+    marginTop: Spacing.xs,
   },
 
   // Section Wrapper
   sectionWrapper: {
     paddingHorizontal: Spacing["xl"],
-    marginTop: Spacing["lg"],
+    marginTop: Spacing.xs,
   },
 
-  // List Items
+  // List Items - Refined
   listContainer: {},
   listItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 14,
+    paddingVertical: Spacing.lg,
     paddingHorizontal: Spacing.lg,
     gap: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(0,0,0,0.08)",
+    borderBottomColor: "rgba(0,0,0,0.05)",
   },
   listItemLast: {
     borderBottomWidth: 0,
   },
   listIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 11,
     justifyContent: "center",
     alignItems: "center",
   },
   listContent: {
     flex: 1,
-    gap: 2,
+    gap: 3,
   },
   listTitle: {
     fontSize: 15,
     fontWeight: "600",
-    color: Colors.text,
+    color: "#1A1A1A",
+    letterSpacing: -0.2,
   },
   listSubtitle: {
     fontSize: 13,
     fontWeight: "500",
-    color: Colors.textSecondary,
+    color: "#5C5C5C",
   },
   listBadge: {
     backgroundColor: Colors.primary,
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 6,
+    paddingHorizontal: 7,
   },
   listBadgeText: {
     fontSize: 12,
     fontWeight: "700",
     color: "#FFFFFF",
-  },
-
-  // Team Stats Grid
-  teamStatsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    padding: Spacing.md,
-    gap: Spacing.sm,
-  },
-  teamStatItem: {
-    flex: 1,
-    minWidth: "45%",
-    backgroundColor: Colors.gray50,
-    borderRadius: 12,
-    padding: Spacing.md,
-    alignItems: "center",
-    gap: Spacing.xs,
-  },
-  teamStatIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  teamStatValue: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: Colors.text,
-  },
-  teamStatLabel: {
-    fontSize: 12,
-    fontWeight: "500",
-    color: Colors.textSecondary,
   },
 });

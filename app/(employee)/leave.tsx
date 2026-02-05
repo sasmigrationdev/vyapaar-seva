@@ -10,7 +10,8 @@ import { useLeaveRequests } from '@/hooks/queries/useLeave';
 import { useCreateLeaveRequest } from '@/hooks/mutations/useLeaveMutations';
 import { formatDate } from '@/lib/utils/date.utils';
 import { LeaveRequest, LeaveType } from '@/lib/types';
-import { Colors, Typography, Spacing, BorderRadius, Shadows, Gradients } from '@/constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows, Gradients, StatusColors } from '@/constants/theme';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 const LEAVE_TYPES: LeaveType[] = ['sick', 'casual', 'earned', 'unpaid', 'other'];
 
@@ -94,16 +95,16 @@ export default function LeaveScreen() {
 
   const renderLeaveItem = ({ item }: { item: LeaveRequest }) => {
     const statusConfig = {
-      pending: { bg: '#FEF3C7', color: '#F59E0B', icon: 'clock-outline' },
-      approved: { bg: '#DCFCE7', color: '#10B981', icon: 'check-circle' },
-      rejected: { bg: '#FEE2E2', color: '#EF4444', icon: 'close-circle' },
+      pending: { bg: StatusColors.pending.background, color: Colors.warning, icon: 'clock-outline' },
+      approved: { bg: StatusColors.approved.background, color: Colors.success, icon: 'check-circle' },
+      rejected: { bg: StatusColors.rejected.background, color: Colors.error, icon: 'close-circle' },
     };
     const leaveTypeConfig = {
-      sick: { bg: '#FEE2E2', color: '#EF4444', icon: 'medical-bag' },
-      casual: { bg: '#DBEAFE', color: '#3B82F6', icon: 'coffee' },
-      earned: { bg: '#DCFCE7', color: '#10B981', icon: 'star' },
-      unpaid: { bg: '#F3E8FF', color: '#A855F7', icon: 'cash-off' },
-      other: { bg: '#F1F5F9', color: '#64748B', icon: 'dots-horizontal' },
+      sick: { bg: StatusColors.rejected.background, color: Colors.error, icon: 'medical-bag' },
+      casual: { bg: '#DBEAFE', color: Colors.info, icon: 'coffee' },
+      earned: { bg: StatusColors.approved.background, color: Colors.success, icon: 'star' },
+      unpaid: { bg: Colors.purpleLight, color: Colors.purple, icon: 'cash-off' },
+      other: { bg: Colors.gray100, color: Colors.gray500, icon: 'dots-horizontal' },
     };
     const config = statusConfig[item.status as keyof typeof statusConfig] || statusConfig.pending;
     const typeConfig = leaveTypeConfig[item.leave_type as keyof typeof leaveTypeConfig] || leaveTypeConfig.other;
@@ -128,7 +129,7 @@ export default function LeaveScreen() {
         <View style={styles.dateRangeContainer}>
           <View style={styles.dateRow}>
             <View style={styles.dateRowLeft}>
-              <Ionicons name="calendar-outline" size={18} color="#64748B" />
+              <Ionicons name="calendar-outline" size={18} color={Colors.gray500} />
               <Text style={styles.dateLabel}>From</Text>
             </View>
             <Text style={styles.dateValue}>{formatDate(new Date(item.start_date))}</Text>
@@ -138,7 +139,7 @@ export default function LeaveScreen() {
 
           <View style={styles.dateRow}>
             <View style={styles.dateRowLeft}>
-              <Ionicons name="calendar" size={18} color="#64748B" />
+              <Ionicons name="calendar" size={18} color={Colors.gray500} />
               <Text style={styles.dateLabel}>To</Text>
             </View>
             <Text style={styles.dateValue}>{formatDate(new Date(item.end_date))}</Text>
@@ -147,7 +148,7 @@ export default function LeaveScreen() {
 
         <View style={styles.reasonContainer}>
           <View style={styles.reasonHeader}>
-            <Feather name="message-square" size={16} color="#64748B" />
+            <Feather name="message-square" size={16} color={Colors.gray500} />
             <Text style={styles.reasonLabel}>Reason</Text>
           </View>
           <Text style={styles.reasonText}>{item.reason}</Text>
@@ -156,7 +157,7 @@ export default function LeaveScreen() {
         {item.reviewer_notes && (
           <View style={styles.reviewerNotesContainer}>
             <View style={styles.reviewerNotesHeader}>
-              <MaterialCommunityIcons name="comment-text-outline" size={16} color="#6366F1" />
+              <MaterialCommunityIcons name="comment-text-outline" size={16} color={Colors.indigo} />
               <Text style={styles.reviewerNotesLabel}>Reviewer Notes</Text>
             </View>
             <Text style={styles.reviewerNotesText}>{item.reviewer_notes}</Text>
@@ -205,6 +206,9 @@ export default function LeaveScreen() {
             style={styles.addButton}
             onPress={() => setModalVisible(true)}
             activeOpacity={0.7}
+            accessibilityLabel="Apply for leave"
+            accessibilityRole="button"
+            accessibilityHint="Opens form to apply for leave"
           >
             <Ionicons name="add-circle" size={20} color={Colors.primary} />
             <Text style={styles.addButtonText}>Apply for Leave</Text>
@@ -217,14 +221,14 @@ export default function LeaveScreen() {
               <ActivityIndicator size="large" color={Colors.primary} />
             </View>
           ) : leaveRequests && leaveRequests.length > 0 ? (
-            leaveRequests.map((item) => (
-              <View key={item.id}>
+            leaveRequests.map((item, index) => (
+              <Animated.View key={item.id} entering={FadeInDown.delay(100 + index * 80).springify()}>
                 {renderLeaveItem({ item })}
-              </View>
+              </Animated.View>
             ))
           ) : (
             <View style={styles.emptyContainer}>
-              <MaterialCommunityIcons name="beach" size={64} color="#CBD5E1" />
+              <MaterialCommunityIcons name="beach" size={64} color={Colors.gray300} />
               <Text style={styles.emptyText}>No leave requests yet</Text>
               <Text style={styles.emptySubtext}>Apply for leave using the button above</Text>
             </View>
@@ -245,8 +249,11 @@ export default function LeaveScreen() {
               <TouchableOpacity
                 onPress={() => setModalVisible(false)}
                 style={styles.closeButton}
+                accessibilityLabel="Close leave application form"
+                accessibilityRole="button"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons name="close" size={24} color="#64748B" />
+                <Ionicons name="close" size={24} color={Colors.gray500} />
               </TouchableOpacity>
             </View>
 
@@ -264,6 +271,9 @@ export default function LeaveScreen() {
                     ]}
                     onPress={() => setFormData({ ...formData, leaveType: type })}
                     activeOpacity={0.7}
+                    accessibilityLabel={`${type} leave`}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: formData.leaveType === type }}
                   >
                     <Text
                       style={[
@@ -284,8 +294,11 @@ export default function LeaveScreen() {
                 style={styles.datePickerButton}
                 onPress={() => setShowStartDatePicker(true)}
                 activeOpacity={0.7}
+                accessibilityLabel={`Start date: ${formData.startDate ? formatDate(new Date(formData.startDate)) : 'not selected'}`}
+                accessibilityRole="button"
+                accessibilityHint="Tap to select start date"
               >
-                <Ionicons name="calendar-outline" size={20} color="#64748B" style={styles.inputIcon} />
+                <Ionicons name="calendar-outline" size={20} color={Colors.gray500} style={styles.inputIcon} />
                 <Text style={[styles.datePickerText, formData.startDate && styles.datePickerTextSelected]}>
                   {formData.startDate ? formatDate(new Date(formData.startDate)) : 'Select start date'}
                 </Text>
@@ -307,8 +320,11 @@ export default function LeaveScreen() {
                 style={styles.datePickerButton}
                 onPress={() => setShowEndDatePicker(true)}
                 activeOpacity={0.7}
+                accessibilityLabel={`End date: ${formData.endDate ? formatDate(new Date(formData.endDate)) : 'not selected'}`}
+                accessibilityRole="button"
+                accessibilityHint="Tap to select end date"
               >
-                <Ionicons name="calendar" size={20} color="#64748B" style={styles.inputIcon} />
+                <Ionicons name="calendar" size={20} color={Colors.gray500} style={styles.inputIcon} />
                 <Text style={[styles.datePickerText, formData.endDate && styles.datePickerTextSelected]}>
                   {formData.endDate ? formatDate(new Date(formData.endDate)) : 'Select end date'}
                 </Text>
@@ -329,12 +345,14 @@ export default function LeaveScreen() {
               <TextInput
                 style={[styles.input, styles.textArea]}
                 placeholder="Enter reason for leave"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={Colors.textTertiary}
                 value={formData.reason}
                 onChangeText={text => setFormData({ ...formData, reason: text })}
                 multiline
                 numberOfLines={4}
                 textAlignVertical="top"
+                accessibilityLabel="Reason for leave"
+                accessibilityHint="Enter the reason for your leave request"
               />
             </View>
 
@@ -345,6 +363,8 @@ export default function LeaveScreen() {
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setModalVisible(false)}
                 activeOpacity={0.7}
+                accessibilityLabel="Cancel"
+                accessibilityRole="button"
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -354,12 +374,15 @@ export default function LeaveScreen() {
                 onPress={handleSubmit}
                 disabled={createLeaveMutation.isPending}
                 activeOpacity={0.7}
+                accessibilityLabel={createLeaveMutation.isPending ? "Submitting request" : "Submit leave request"}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: createLeaveMutation.isPending }}
               >
                 {createLeaveMutation.isPending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={Colors.textInverse} />
                 ) : (
                   <>
-                    <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+                    <Ionicons name="checkmark-circle" size={20} color={Colors.textInverse} />
                     <Text style={styles.submitButtonText}>Submit Request</Text>
                   </>
                 )}
@@ -453,7 +476,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: Spacing.lg,
   },
   cardHeaderLeft: {
     flexDirection: 'row',
@@ -471,12 +494,12 @@ const styles = StyleSheet.create({
   leaveTypeTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.text,
     textTransform: 'capitalize',
   },
   cardSubtext: {
     fontSize: 12,
-    color: '#64748B',
+    color: Colors.gray500,
     fontWeight: '500',
     marginTop: 2,
   },
@@ -491,10 +514,10 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   dateRangeContainer: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
   },
   dateRow: {
     flexDirection: 'row',
@@ -504,22 +527,22 @@ const styles = StyleSheet.create({
   dateRowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: Spacing.sm,
   },
   dateLabel: {
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '600',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.gray500,
+    fontWeight: Typography.fontWeight.semibold,
   },
   dateValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.text,
   },
   dateDivider: {
     height: 1,
-    backgroundColor: '#E2E8F0',
-    marginVertical: 12,
+    backgroundColor: Colors.border,
+    marginVertical: Spacing.md,
   },
   reasonContainer: {
     marginBottom: 8,
@@ -532,23 +555,23 @@ const styles = StyleSheet.create({
   },
   reasonLabel: {
     fontSize: 13,
-    color: '#64748B',
-    fontWeight: '600',
+    color: Colors.gray500,
+    fontWeight: Typography.fontWeight.semibold,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   reasonText: {
-    fontSize: 14,
-    color: '#334155',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.gray700,
     lineHeight: 20,
   },
   reviewerNotesContainer: {
-    marginTop: 16,
-    padding: 16,
-    backgroundColor: '#EEF2FF',
-    borderRadius: 12,
+    marginTop: Spacing.lg,
+    padding: Spacing.lg,
+    backgroundColor: Colors.indigoLight,
+    borderRadius: BorderRadius.lg,
     borderLeftWidth: 3,
-    borderLeftColor: '#6366F1',
+    borderLeftColor: Colors.indigo,
   },
   reviewerNotesHeader: {
     flexDirection: 'row',
@@ -558,14 +581,14 @@ const styles = StyleSheet.create({
   },
   reviewerNotesLabel: {
     fontSize: 13,
-    color: '#6366F1',
-    fontWeight: '600',
+    color: Colors.indigo,
+    fontWeight: Typography.fontWeight.semibold,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   reviewerNotesText: {
-    fontSize: 14,
-    color: '#334155',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.gray700,
     lineHeight: 20,
   },
   loadingContainer: {
@@ -581,14 +604,14 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   emptyText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#64748B',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.gray500,
     textAlign: 'center',
   },
   emptySubtext: {
-    fontSize: 14,
-    color: '#94A3B8',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textTertiary,
     textAlign: 'center',
   },
   modalContainer: {
@@ -597,149 +620,149 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 24,
+    backgroundColor: Colors.background,
+    borderTopLeftRadius: BorderRadius["3xl"],
+    borderTopRightRadius: BorderRadius["3xl"],
+    padding: Spacing["2xl"],
     maxHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: Spacing["2xl"],
   },
   modalTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: Typography.fontSize["2xl"],
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.text,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: Colors.gray100,
     justifyContent: 'center',
     alignItems: 'center',
   },
   formSection: {
-    marginBottom: 20,
+    marginBottom: Spacing.xl,
   },
   label: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#0F172A',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    marginBottom: Spacing.sm,
+    color: Colors.text,
   },
   typeSelector: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: Spacing.sm,
   },
   typeButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius["2xl"],
     borderWidth: 2,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
+    borderColor: Colors.border,
+    backgroundColor: Colors.backgroundSecondary,
   },
   typeButtonActive: {
-    backgroundColor: '#6366F1',
-    borderColor: '#6366F1',
+    backgroundColor: Colors.indigo,
+    borderColor: Colors.indigo,
   },
   typeButtonText: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.gray500,
     textTransform: 'capitalize',
-    fontWeight: '600',
+    fontWeight: Typography.fontWeight.semibold,
   },
   typeButtonTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
+    color: Colors.textInverse,
+    fontWeight: Typography.fontWeight.bold,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 16,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.backgroundSecondary,
+    paddingHorizontal: Spacing.lg,
   },
   inputIcon: {
-    marginRight: 8,
+    marginRight: Spacing.sm,
   },
   input: {
     flex: 1,
-    paddingVertical: 14,
-    fontSize: 15,
-    color: '#0F172A',
+    paddingVertical: Spacing.md,
+    fontSize: Typography.fontSize.base,
+    color: Colors.text,
   },
   textArea: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 15,
-    backgroundColor: '#F8FAFC',
-    color: '#0F172A',
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    fontSize: Typography.fontSize.base,
+    backgroundColor: Colors.backgroundSecondary,
+    color: Colors.text,
     height: 100,
   },
   datePickerButton: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.backgroundSecondary,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
   },
   datePickerText: {
     flex: 1,
-    fontSize: 15,
-    color: '#94A3B8',
+    fontSize: Typography.fontSize.base,
+    color: Colors.textTertiary,
   },
   datePickerTextSelected: {
-    color: '#0F172A',
+    color: Colors.text,
   },
   modalActions: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-    paddingTop: 16,
+    gap: Spacing.md,
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: Colors.gray100,
   },
   modalButton: {
     flex: 1,
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: Spacing.lg,
+    borderRadius: BorderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: 8,
+    gap: Spacing.sm,
   },
   cancelButton: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: Colors.gray100,
   },
   cancelButtonText: {
-    color: '#475569',
-    fontSize: 16,
-    fontWeight: '600',
+    color: Colors.gray600,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
   },
   submitButton: {
-    backgroundColor: '#6366F1',
-    shadowColor: '#6366F1',
+    backgroundColor: Colors.indigo,
+    shadowColor: Colors.indigo,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
   },
   submitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    color: Colors.textInverse,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
   },
 });

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -19,7 +19,7 @@ import { OvertimeRequestWithUser, OvertimeRequestStatus } from '@/lib/types';
 import OvertimeApprovalModal from '@/components/attendance/OvertimeApprovalModal';
 import { formatDate, formatTime } from '@/lib/utils/date.utils';
 import { formatHours } from '@/lib/utils/attendance.utils';
-import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, StatusColors } from '@/constants/theme';
 
 export default function OvertimeRequestsScreen() {
   const insets = useSafeAreaInsets();
@@ -28,20 +28,25 @@ export default function OvertimeRequestsScreen() {
   const [selectedRequest, setSelectedRequest] = useState<OvertimeRequestWithUser | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | OvertimeRequestStatus>('all');
 
+  // Memoize filters to prevent React Compiler cache size issues
+  const organizationId = user?.organization_id || '';
+  const overtimeFilters = useMemo(
+    () =>
+      statusFilter === 'all'
+        ? { organizationId }
+        : { status: statusFilter, organizationId },
+    [statusFilter, organizationId]
+  );
+
   const {
     data: overtimeRequests,
     isLoading,
     error,
     refetch,
     isFetching,
-  } = useAllOvertimeRequests(
-    statusFilter === 'all'
-      ? { organizationId: user?.organization_id || '' }
-      : { status: statusFilter, organizationId: user?.organization_id || '' },
-    {
-      enabled: !!user?.organization_id,
-    }
-  );
+  } = useAllOvertimeRequests(overtimeFilters, {
+    enabled: !!user?.organization_id,
+  });
 
   const pendingCount = overtimeRequests?.filter((req) => req.status === 'pending').length || 0;
   const approvedCount = overtimeRequests?.filter((req) => req.status === 'approved').length || 0;
@@ -119,9 +124,9 @@ export default function OvertimeRequestsScreen() {
           </View>
 
           <View style={styles.cardDetailRow}>
-            <MaterialCommunityIcons name="clock-plus-outline" size={14} color="#8B5CF6" />
+            <MaterialCommunityIcons name="clock-plus-outline" size={14} color={Colors.purple} />
             <Text style={styles.cardDetailLabel}>Requested:</Text>
-            <Text style={[styles.cardDetailValue, { color: '#8B5CF6', fontWeight: '700' }]}>
+            <Text style={[styles.cardDetailValue, { color: Colors.purple, fontWeight: '700' }]}>
               {formatHours(item.requested_hours)}
             </Text>
           </View>
@@ -167,8 +172,8 @@ export default function OvertimeRequestsScreen() {
         {/* Footer for pending requests */}
         {item.status === 'pending' && (
           <View style={styles.cardFooter}>
-            <Ionicons name="hand-right-outline" size={14} color="#8B5CF6" />
-            <Text style={[styles.cardFooterText, { color: '#8B5CF6' }]}>Tap to review</Text>
+            <Ionicons name="hand-right-outline" size={14} color={Colors.purple} />
+            <Text style={[styles.cardFooterText, { color: Colors.purple }]}>Tap to review</Text>
           </View>
         )}
 
@@ -193,7 +198,7 @@ export default function OvertimeRequestsScreen() {
             headerShown: true,
           }}
         />
-        <ActivityIndicator size="large" color="#8B5CF6" />
+        <ActivityIndicator size="large" color={Colors.purple} />
         <Text style={styles.loadingText}>Loading overtime requests...</Text>
       </View>
     );
@@ -332,8 +337,8 @@ export default function OvertimeRequestsScreen() {
             <RefreshControl
               refreshing={isFetching}
               onRefresh={refetch}
-              tintColor="#8B5CF6"
-              colors={['#8B5CF6']}
+              tintColor={Colors.purple}
+              colors={[Colors.purple]}
             />
           }
           showsVerticalScrollIndicator={false}
@@ -390,7 +395,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing['lg'],
     paddingHorizontal: Spacing['2xl'],
     paddingVertical: Spacing['md'],
-    backgroundColor: '#8B5CF6',
+    backgroundColor: Colors.purple,
     borderRadius: BorderRadius.lg,
   },
   retryButtonText: {
@@ -449,8 +454,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   filterChipActive: {
-    backgroundColor: '#8B5CF6',
-    borderColor: '#8B5CF6',
+    backgroundColor: Colors.purple,
+    borderColor: Colors.purple,
   },
   filterChipText: {
     fontSize: Typography.fontSize.sm,
@@ -469,7 +474,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   filterChipBadgeActive: {
-    backgroundColor: '#A78BFA',
+    backgroundColor: StatusColors.overtime.border,
   },
   filterChipBadgeText: {
     fontSize: Typography.fontSize.xs,
@@ -508,7 +513,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: BorderRadius.lg,
-    backgroundColor: '#FAF5FF',
+    backgroundColor: Colors.purpleLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -598,15 +603,15 @@ const styles = StyleSheet.create({
   },
   reviewerSection: {
     padding: Spacing['md'],
-    backgroundColor: '#FAF5FF',
+    backgroundColor: Colors.purpleLight,
     borderRadius: BorderRadius.lg,
     borderLeftWidth: 3,
-    borderLeftColor: '#8B5CF6',
+    borderLeftColor: Colors.purple,
   },
   reviewerLabel: {
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.semibold,
-    color: '#8B5CF6',
+    color: Colors.purple,
     textTransform: 'uppercase',
     marginBottom: Spacing['xs'],
     letterSpacing: 0.5,

@@ -9,6 +9,7 @@ import {
   TextInput,
   RefreshControl,
 } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useAlert } from '@/hooks/useAlert';
 import { Text } from '@/components/ui/Text';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
@@ -106,7 +107,13 @@ const InfoRow = ({
       </View>
       <View style={styles.infoRowRight}>
         {showToggle && value && (
-          <TouchableOpacity onPress={onToggle} style={styles.toggleButton}>
+          <TouchableOpacity
+            onPress={onToggle}
+            style={styles.toggleButton}
+            accessibilityLabel={isVisible ? `Hide ${label}` : `Show ${label}`}
+            accessibilityRole="button"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             <Ionicons
               name={isVisible ? 'eye-off-outline' : 'eye-outline'}
               size={18}
@@ -115,7 +122,13 @@ const InfoRow = ({
           </TouchableOpacity>
         )}
         {editable && (
-          <TouchableOpacity onPress={onEdit} style={styles.editButton}>
+          <TouchableOpacity
+            onPress={onEdit}
+            style={styles.editButton}
+            accessibilityLabel={`Edit ${label}`}
+            accessibilityRole="button"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
             <Ionicons name="create-outline" size={18} color={Colors.primary} />
           </TouchableOpacity>
         )}
@@ -139,7 +152,13 @@ const SectionHeader = ({ icon, title, onEdit, editLabel = 'Edit' }: SectionHeade
       <Text style={styles.sectionTitle}>{title}</Text>
     </View>
     {onEdit && (
-      <TouchableOpacity onPress={onEdit} style={styles.sectionEditButton} activeOpacity={0.7}>
+      <TouchableOpacity
+        onPress={onEdit}
+        style={styles.sectionEditButton}
+        activeOpacity={0.7}
+        accessibilityLabel={`${editLabel} ${title}`}
+        accessibilityRole="button"
+      >
         <Ionicons name="create-outline" size={16} color={Colors.primary} />
         <Text style={styles.sectionEditText}>{editLabel}</Text>
       </TouchableOpacity>
@@ -343,7 +362,7 @@ export default function ProfileScreen() {
         </LinearGradient>
 
         {/* Quick Stats Row */}
-        <View style={styles.quickStatsRow}>
+        <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.quickStatsRow}>
           <View style={styles.quickStatCard}>
             <MaterialCommunityIcons name="office-building" size={20} color={Colors.primary} />
             <Text style={styles.quickStatLabel}>Department</Text>
@@ -359,10 +378,10 @@ export default function ProfileScreen() {
               {calculateTenure(user?.created_at)}
             </Text>
           </View>
-        </View>
+        </Animated.View>
 
         {/* Personal Information Card */}
-        <View style={styles.card}>
+        <Animated.View entering={FadeInDown.delay(150).springify()} style={styles.card}>
           <SectionHeader
             icon="account-circle"
             title="Personal Information"
@@ -394,10 +413,10 @@ export default function ProfileScreen() {
               onToggle={() => setShowAadhaar(!showAadhaar)}
             />
           </View>
-        </View>
+        </Animated.View>
 
         {/* Work Information Card */}
-        <View style={styles.card}>
+        <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.card}>
           <SectionHeader icon="briefcase" title="Work Information" />
 
           <View style={styles.cardContent}>
@@ -424,10 +443,10 @@ export default function ProfileScreen() {
               value={user?.created_at ? formatDate(new Date(user.created_at)) : null}
             />
           </View>
-        </View>
+        </Animated.View>
 
         {/* Banking Information Card */}
-        <View style={styles.card}>
+        <Animated.View entering={FadeInDown.delay(250).springify()} style={styles.card}>
           <SectionHeader
             icon="bank"
             title="Banking Information"
@@ -507,16 +526,18 @@ export default function ProfileScreen() {
                 style={styles.addBankButton}
                 onPress={() => setShowBankInfoModal(true)}
                 activeOpacity={0.7}
+                accessibilityLabel="Add Bank Details"
+                accessibilityRole="button"
               >
                 <Ionicons name="add-circle-outline" size={18} color={Colors.primary} />
                 <Text style={styles.addBankButtonText}>Add Bank Details</Text>
               </TouchableOpacity>
             </View>
           )}
-        </View>
+        </Animated.View>
 
         {/* Employment Actions Card */}
-        <View style={styles.card}>
+        <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.card}>
           <SectionHeader icon="briefcase-account" title="Employment" />
 
           <View style={styles.cardContent}>
@@ -524,6 +545,8 @@ export default function ProfileScreen() {
               style={styles.actionRow}
               onPress={() => router.push('/(employee)/employment-history')}
               activeOpacity={0.6}
+              accessibilityLabel="Employment History: View your past and current employment"
+              accessibilityRole="button"
             >
               <View style={styles.actionIconWrapper}>
                 <MaterialCommunityIcons name="history" size={20} color={Colors.primary} />
@@ -541,6 +564,8 @@ export default function ProfileScreen() {
               style={styles.actionRow}
               onPress={() => router.push('/(employee)/search-employer')}
               activeOpacity={0.6}
+              accessibilityLabel={`Search Employer: ${isCurrentlyEmployed ? 'Find and request to join new employer' : 'Find employer to join'}`}
+              accessibilityRole="button"
             >
               <View style={styles.actionIconWrapper}>
                 <MaterialCommunityIcons name="account-search" size={20} color={Colors.primary} />
@@ -561,6 +586,8 @@ export default function ProfileScreen() {
                   style={styles.actionRow}
                   onPress={handleChangeEmployer}
                   activeOpacity={0.6}
+                  accessibilityLabel="Change Employer: Leave current employer and join another"
+                  accessibilityRole="button"
                 >
                   <View style={[styles.actionIconWrapper, styles.actionIconDanger]}>
                     <MaterialCommunityIcons name="briefcase-remove" size={20} color={Colors.error} />
@@ -574,10 +601,10 @@ export default function ProfileScreen() {
               </>
             )}
           </View>
-        </View>
+        </Animated.View>
 
         {/* Security Card */}
-        <View style={styles.card}>
+        <Animated.View entering={FadeInDown.delay(350).springify()} style={styles.card}>
           <SectionHeader icon="shield-lock" title="Security" />
 
           <View style={styles.cardContent}>
@@ -599,6 +626,8 @@ export default function ProfileScreen() {
               style={styles.actionRow}
               onPress={() => setShowPasswordModal(true)}
               activeOpacity={0.6}
+              accessibilityLabel="Change Password: Update your account password"
+              accessibilityRole="button"
             >
               <View style={styles.actionIconWrapper}>
                 <Ionicons name="lock-closed-outline" size={20} color={Colors.primary} />
@@ -622,6 +651,9 @@ export default function ProfileScreen() {
               onPress={handleToggleAutoCheckin}
               disabled={updateAutoCheckinMutation.isPending}
               activeOpacity={0.6}
+              accessibilityLabel={`Auto Check-In: ${autoCheckinEnabled ? 'Enabled, auto check-in/out via WiFi' : 'Disabled, tap to enable'}`}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: autoCheckinEnabled, disabled: updateAutoCheckinMutation.isPending }}
             >
               <View style={[
                 styles.actionIconWrapper,
@@ -692,6 +724,9 @@ export default function ProfileScreen() {
                   onPress={handleEnablePushNotifications}
                   disabled={isRegistering}
                   activeOpacity={0.7}
+                  accessibilityLabel="Enable push notifications"
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isRegistering }}
                 >
                   {isRegistering ? (
                     <ActivityIndicator size="small" color={Colors.textInverse} />
@@ -705,30 +740,36 @@ export default function ProfileScreen() {
               )}
             </View>
           </View>
-        </View>
+        </Animated.View>
 
         {/* Sign Out Button */}
-        <TouchableOpacity
-          style={styles.signOutButton}
-          onPress={handleSignOut}
-          disabled={signOutMutation.isPending}
-          activeOpacity={0.7}
-        >
-          {signOutMutation.isPending ? (
-            <ActivityIndicator size="small" color={Colors.textInverse} />
-          ) : (
-            <>
-              <MaterialCommunityIcons name="logout" size={20} color={Colors.textInverse} />
-              <Text style={styles.signOutButtonText}>Sign Out</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <Animated.View entering={FadeInDown.delay(400).springify()}>
+          <TouchableOpacity
+            style={styles.signOutButton}
+            onPress={handleSignOut}
+            disabled={signOutMutation.isPending}
+            activeOpacity={0.7}
+            accessibilityLabel="Sign Out"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: signOutMutation.isPending }}
+            accessibilityHint="Sign out of your account"
+          >
+            {signOutMutation.isPending ? (
+              <ActivityIndicator size="small" color={Colors.textInverse} />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="logout" size={20} color={Colors.textInverse} />
+                <Text style={styles.signOutButtonText}>Sign Out</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </Animated.View>
 
         {/* Footer */}
-        <View style={styles.footer}>
+        <Animated.View entering={FadeInDown.delay(450).springify()} style={styles.footer}>
           <Text style={styles.footerText}>Version 1.0.0</Text>
           <Text style={styles.footerSubtext}>Salary Book & Attendance App</Text>
-        </View>
+        </Animated.View>
       </ScrollView>
 
       {/* Password Reset Modal */}
@@ -745,6 +786,9 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 onPress={() => setShowPasswordModal(false)}
                 style={styles.modalCloseButton}
+                accessibilityLabel="Close password modal"
+                accessibilityRole="button"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </TouchableOpacity>
@@ -762,10 +806,15 @@ export default function ProfileScreen() {
                     placeholder="Enter current password"
                     placeholderTextColor={Colors.textTertiary}
                     autoCapitalize="none"
+                    accessibilityLabel="Current password input"
+                    accessibilityHint="Enter your current password"
                   />
                   <TouchableOpacity
                     onPress={() => setShowOldPassword(!showOldPassword)}
                     style={styles.eyeIcon}
+                    accessibilityLabel={showOldPassword ? 'Hide current password' : 'Show current password'}
+                    accessibilityRole="button"
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
                     <Ionicons
                       name={showOldPassword ? 'eye-off-outline' : 'eye-outline'}
@@ -787,10 +836,15 @@ export default function ProfileScreen() {
                     placeholder="Enter new password"
                     placeholderTextColor={Colors.textTertiary}
                     autoCapitalize="none"
+                    accessibilityLabel="New password input"
+                    accessibilityHint="Enter your new password, minimum 6 characters"
                   />
                   <TouchableOpacity
                     onPress={() => setShowNewPassword(!showNewPassword)}
                     style={styles.eyeIcon}
+                    accessibilityLabel={showNewPassword ? 'Hide new password' : 'Show new password'}
+                    accessibilityRole="button"
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
                     <Ionicons
                       name={showNewPassword ? 'eye-off-outline' : 'eye-outline'}
@@ -812,10 +866,15 @@ export default function ProfileScreen() {
                     placeholder="Confirm new password"
                     placeholderTextColor={Colors.textTertiary}
                     autoCapitalize="none"
+                    accessibilityLabel="Confirm new password input"
+                    accessibilityHint="Re-enter your new password to confirm"
                   />
                   <TouchableOpacity
                     onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                     style={styles.eyeIcon}
+                    accessibilityLabel={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                    accessibilityRole="button"
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
                     <Ionicons
                       name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
@@ -831,6 +890,9 @@ export default function ProfileScreen() {
                   style={styles.cancelButton}
                   onPress={() => setShowPasswordModal(false)}
                   disabled={resetPasswordMutation.isPending}
+                  accessibilityLabel="Cancel"
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: resetPasswordMutation.isPending }}
                 >
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
@@ -839,6 +901,9 @@ export default function ProfileScreen() {
                   style={styles.confirmButton}
                   onPress={handleResetPassword}
                   disabled={resetPasswordMutation.isPending}
+                  accessibilityLabel={resetPasswordMutation.isPending ? 'Updating password' : 'Update Password'}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: resetPasswordMutation.isPending }}
                 >
                   {resetPasswordMutation.isPending ? (
                     <ActivityIndicator size="small" color={Colors.textInverse} />

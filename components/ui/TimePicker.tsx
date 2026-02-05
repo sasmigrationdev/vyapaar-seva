@@ -3,12 +3,14 @@ import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/ui/Text';
+import { Colors, Spacing, BorderRadius } from '@/constants/theme';
 
 interface TimePickerProps {
   value: string; // Time string (HH:MM)
   onChange: (time: string) => void;
   label?: string;
   required?: boolean;
+  disabled?: boolean;
   iconColor?: string;
   iconName?: string;
 }
@@ -18,7 +20,8 @@ export default function TimePicker({
   onChange,
   label,
   required = false,
-  iconColor = '#64748B',
+  disabled = false,
+  iconColor = Colors.gray500,
   iconName = 'time-outline',
 }: TimePickerProps) {
   const [showPicker, setShowPicker] = useState(false);
@@ -73,15 +76,20 @@ export default function TimePicker({
       )}
 
       <TouchableOpacity
-        style={styles.inputWrapper}
-        onPress={() => setShowPicker(true)}
-        activeOpacity={0.7}
+        style={[styles.inputWrapper, disabled && styles.inputWrapperDisabled]}
+        onPress={() => !disabled && setShowPicker(true)}
+        activeOpacity={disabled ? 1 : 0.7}
+        disabled={disabled}
+        accessibilityLabel={`${label || 'Time'}: ${value ? formatDisplayTime(value) : 'not selected'}${required ? ', required' : ''}${disabled ? ', disabled' : ''}`}
+        accessibilityRole="button"
+        accessibilityHint={disabled ? undefined : "Tap to select time"}
+        accessibilityState={{ disabled }}
       >
-        <Ionicons name={iconName as any} size={20} color={iconColor} />
-        <Text style={[styles.inputText, !value && styles.placeholder]}>
+        <Ionicons name={iconName as any} size={20} color={disabled ? Colors.gray300 : iconColor} />
+        <Text style={[styles.inputText, !value && styles.placeholder, disabled && styles.disabledText]}>
           {formatDisplayTime(value)}
         </Text>
-        <Ionicons name="chevron-down" size={20} color="#64748B" />
+        <Ionicons name="chevron-down" size={20} color={disabled ? Colors.gray300 : Colors.gray500} />
       </TouchableOpacity>
 
       {showPicker && (
@@ -98,6 +106,8 @@ export default function TimePicker({
           <TouchableOpacity
             onPress={() => setShowPicker(false)}
             style={styles.iosButton}
+            accessibilityLabel="Done selecting time"
+            accessibilityRole="button"
           >
             <Text style={styles.iosButtonText}>Done</Text>
           </TouchableOpacity>
@@ -109,49 +119,57 @@ export default function TimePicker({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 20,
+    marginBottom: Spacing.xl,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#334155',
-    marginBottom: 8,
+    color: Colors.text,
+    marginBottom: Spacing.sm,
   },
   required: {
-    color: '#EF4444',
+    color: Colors.error,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md + 2,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 12,
+    borderColor: Colors.border,
+    gap: Spacing.md,
   },
   inputText: {
     flex: 1,
     fontSize: 15,
-    color: '#0F172A',
+    color: Colors.text,
   },
   placeholder: {
-    color: '#94A3B8',
+    color: Colors.textTertiary,
+  },
+  inputWrapperDisabled: {
+    backgroundColor: Colors.gray100,
+    borderColor: Colors.gray200,
+    opacity: 0.7,
+  },
+  disabledText: {
+    color: Colors.gray400,
   },
   iosPickerActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    paddingTop: 8,
+    paddingTop: Spacing.sm,
   },
   iosButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#6366F1',
-    borderRadius: 8,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.indigo,
+    borderRadius: BorderRadius.md,
   },
   iosButtonText: {
-    color: '#FFFFFF',
+    color: Colors.textInverse,
     fontSize: 14,
     fontWeight: '600',
   },

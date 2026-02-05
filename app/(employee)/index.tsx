@@ -1,14 +1,19 @@
 import AddOvertimeModal from "@/components/attendance/AddOvertimeModal";
 import BreakRequestModal from "@/components/attendance/BreakRequestModal";
 import WiFiVerificationModal from "@/components/attendance/WiFiVerificationModal";
-import SalaryProgressCard from "@/components/salary/SalaryProgressCard";
+import AttendanceStreakBadge from "@/components/ui/AttendanceStreakBadge";
+import CircularHoursProgress from "@/components/ui/CircularHoursProgress";
 import { DepthButton } from "@/components/ui/DepthButton";
+import { DynamicGreetingInline } from "@/components/ui/DynamicGreeting";
+import MarketingBanner, { PlaceholderBanner } from "@/components/ui/MarketingBanner";
+import MiniCalendarHeatmap from "@/components/ui/MiniCalendarHeatmap";
 import { NeumorphicCheckInButton } from "@/components/ui/NeumorphicCheckInButton";
 import { Text } from "@/components/ui/Text";
 import {
   BorderRadius,
   Colors,
   Gradients,
+  PressOpacity,
   Shadows,
   Spacing,
   StatusColors,
@@ -24,10 +29,7 @@ import {
   useMonthlyAttendanceSummary,
   useTodayAttendance,
 } from "@/hooks/queries/useAttendance";
-import {
-  useUserAttendanceSummary,
-  attendanceSummaryKeys,
-} from "@/hooks/queries/useAttendanceSummary";
+import { useUserAttendanceSummary } from "@/hooks/queries/useAttendanceSummary";
 import { useMyBreakRequests } from "@/hooks/queries/useBreakRequests";
 import { useCurrentMonthEarnings } from "@/hooks/queries/useEarnings";
 import { useOvertimeRequestByAttendance } from "@/hooks/queries/useOvertimeRequests";
@@ -38,6 +40,7 @@ import { useAutoRejectExpiredBreaks } from "@/hooks/useAutoRejectExpiredBreaks";
 import { useAutoAttendance } from "@/hooks/useAutoAttendance";
 import { WeekDay } from "@/lib/types";
 import {
+  calculateAttendanceStreak,
   calculateBreakDuration,
   formatHours,
 } from "@/lib/utils/attendance.utils";
@@ -64,6 +67,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { useAlert } from "@/hooks/useAlert";
 
 export default function EmployeeDashboard() {
@@ -87,11 +91,13 @@ export default function EmployeeDashboard() {
   const {
     data: todayAttendance,
     isLoading: loadingToday,
+    error: todayError,
     refetch: refetchToday,
   } = useTodayAttendance(userId);
   const {
     data: monthlySummary,
     isLoading: loadingMonthly,
+    error: monthlyError,
     refetch: refetchMonthly,
   } = useMonthlyAttendanceSummary(
     userId,
@@ -111,6 +117,7 @@ export default function EmployeeDashboard() {
   const {
     data: monthlyStats,
     isLoading: monthlyStatsLoading,
+    error: monthlyStatsError,
     refetch: refetchMonthlyStats,
   } = useUserAttendanceSummary(
     userId,
@@ -260,7 +267,10 @@ export default function EmployeeDashboard() {
       }, 2000); // Give user 2 seconds to see the modal
     } else {
       // Verification required but failed - don't proceed
-      console.log("WiFi verification failed. Check-in blocked.");
+      error(
+        "WiFi Verification Required",
+        "Your organization requires WiFi verification. Please connect to the office WiFi network and try again."
+      );
     }
   };
 
@@ -300,7 +310,10 @@ export default function EmployeeDashboard() {
       }, 2000); // Give user 2 seconds to see the modal
     } else {
       // Verification required but failed - don't proceed
-      console.log("WiFi verification failed. Cannot end break.");
+      error(
+        "WiFi Verification Required",
+        "Your organization requires WiFi verification. Please connect to the office WiFi network and try again."
+      );
     }
   };
 
@@ -355,7 +368,10 @@ export default function EmployeeDashboard() {
       }, 2000); // Give user 2 seconds to see the modal
     } else {
       // Verification required but failed - don't proceed
-      console.log("WiFi verification failed. Check-out blocked.");
+      error(
+        "WiFi Verification Required",
+        "Your organization requires WiFi verification. Please connect to the office WiFi network and try again."
+      );
     }
   };
 
@@ -383,13 +399,8 @@ export default function EmployeeDashboard() {
     },
   });
 
-  // Get time-based greeting
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good Morning";
-    if (hour < 17) return "Good Afternoon";
-    return "Good Evening";
-  };
+  // Calculate attendance streak
+  const attendanceStreak = calculateAttendanceStreak(monthlySummary?.records || []);
 
   // Get attendance color based on percentage
   const getAttendanceColor = (percentage?: number) => {
@@ -417,6 +428,9 @@ export default function EmployeeDashboard() {
       setRefreshing(false);
     }
   };
+
+  // Check for any loading errors
+  const hasError = todayError || monthlyError || monthlyStatsError;
 
   return (
     <View style={styles.container}>
@@ -447,7 +461,7 @@ export default function EmployeeDashboard() {
         >
           <View style={styles.heroHeaderRow}>
             <View style={styles.heroTextBlock}>
-              <Text style={styles.heroGreetingSmall}>{getGreeting()}</Text>
+              <DynamicGreetingInline userName={user?.full_name || ""} />
               <Text style={styles.heroGreeting}>
                 {user?.full_name?.split(" ")[0]}
               </Text>
@@ -462,6 +476,8 @@ export default function EmployeeDashboard() {
             <TouchableOpacity
               style={styles.avatarButton}
               onPress={() => router.push("/profile")}
+              accessibilityLabel="Open profile settings"
+              accessibilityRole="button"
             >
               <Text style={styles.avatarLetter}>
                 {user?.full_name?.charAt(0).toUpperCase()}
@@ -578,17 +594,54 @@ export default function EmployeeDashboard() {
           )}
         </LinearGradient>
 
+        {/* Error Banner */}
+        {hasError && (
+          <Animated.View entering={FadeInDown.delay(50).springify()} style={styles.errorBanner}>
+            <Ionicons name="alert-circle" size={20} color={Colors.error} />
+            <Text style={styles.errorText}>Failed to load some data</Text>
+            <TouchableOpacity
+              onPress={onRefresh}
+              activeOpacity={PressOpacity.primary}
+              accessibilityLabel="Retry loading data"
+              accessibilityRole="button"
+            >
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
+        {/* Promotional Banner Slot */}
+        <Animated.View entering={FadeInDown.delay(75).springify()} style={styles.bannerSlot}>
+          <MarketingBanner
+            variant="gradient"
+            title="Track Your Progress"
+            subtitle="View detailed attendance insights and earn rewards for consistency"
+            ctaText="Learn More"
+            gradientColors={[Colors.primary, Colors.primaryDark]}
+            badge="NEW"
+            aspectRatio={3}
+          />
+        </Animated.View>
+
         <View style={styles.content}>
           {/* Attendance Card */}
-          <View style={styles.modernSection}>
+          <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.modernSection}>
             <View style={styles.modernSectionHeader}>
-              <Text style={styles.modernSectionTitle}>Today's Attendance</Text>
-              {todayAttendance && !todayAttendance.check_out_time && (
-                <View style={styles.liveBadge}>
-                  <View style={styles.pulseDot} />
-                  <Text style={styles.liveText}>Active</Text>
-                </View>
-              )}
+              <Text style={styles.modernSectionTitle}>Today&apos;s Attendance</Text>
+              <View style={styles.headerBadgesRow}>
+                {attendanceStreak.currentStreak > 0 && (
+                  <AttendanceStreakBadge
+                    currentStreak={attendanceStreak.currentStreak}
+                    size="sm"
+                  />
+                )}
+                {todayAttendance && !todayAttendance.check_out_time && (
+                  <View style={styles.liveBadge}>
+                    <View style={styles.pulseDot} />
+                    <Text style={styles.liveText}>Active</Text>
+                  </View>
+                )}
+              </View>
             </View>
 
             <View style={styles.card}>
@@ -601,7 +654,7 @@ export default function EmployeeDashboard() {
                   {todayAttendance ? (
                     <>
                       <View style={styles.attendanceInfo}>
-                        <View style={styles.timeCard}>
+                        <Animated.View entering={FadeInUp.delay(100).springify()} style={styles.timeCard}>
                           <Ionicons
                             name="log-in-outline"
                             size={16}
@@ -615,9 +668,9 @@ export default function EmployeeDashboard() {
                               )}
                             </Text>
                           </View>
-                        </View>
+                        </Animated.View>
 
-                        <View style={styles.timeCard}>
+                        <Animated.View entering={FadeInUp.delay(180).springify()} style={styles.timeCard}>
                           <Ionicons
                             name="log-out-outline"
                             size={16}
@@ -633,9 +686,9 @@ export default function EmployeeDashboard() {
                                 : "--:--"}
                             </Text>
                           </View>
-                        </View>
+                        </Animated.View>
 
-                        <View style={styles.timeCard}>
+                        <Animated.View entering={FadeInUp.delay(260).springify()} style={styles.timeCard}>
                           <Ionicons
                             name="timer-outline"
                             size={16}
@@ -657,7 +710,7 @@ export default function EmployeeDashboard() {
                               </Text>
                             )}
                           </View>
-                        </View>
+                        </Animated.View>
                       </View>
 
                       {totalBreakDuration > 0 && (
@@ -682,7 +735,7 @@ export default function EmployeeDashboard() {
                                 <MaterialCommunityIcons
                                   name="clock-plus-outline"
                                   size={24}
-                                  color="#F59E0B"
+                                  color={Colors.warning}
                                 />
                                 <View style={styles.overtimePendingInfo}>
                                   <Text style={styles.overtimePendingHours}>
@@ -699,7 +752,7 @@ export default function EmployeeDashboard() {
                                 <MaterialCommunityIcons
                                   name="shield-check-outline"
                                   size={14}
-                                  color="#92400E"
+                                  color={StatusColors.pending.text}
                                 />
                                 <Text style={styles.overtimePendingFooterText}>
                                   Awaiting HR review and approval
@@ -712,7 +765,7 @@ export default function EmployeeDashboard() {
                                 <Ionicons
                                   name="close-circle"
                                   size={16}
-                                  color="#EF4444"
+                                  color={Colors.error}
                                 />
                                 <Text style={styles.overtimeRejectedLabel}>
                                   Request Rejected
@@ -735,7 +788,7 @@ export default function EmployeeDashboard() {
                                 <MaterialCommunityIcons
                                   name="clock-plus-outline"
                                   size={16}
-                                  color="#8B5CF6"
+                                  color={Colors.purple}
                                 />
                                 <Text style={styles.overtimeDisplayLabel}>
                                   Overtime
@@ -755,11 +808,14 @@ export default function EmployeeDashboard() {
                               style={styles.addOvertimeButton}
                               onPress={() => setShowOvertimeModal(true)}
                               activeOpacity={0.7}
+                              accessibilityLabel="Add overtime hours"
+                              accessibilityRole="button"
+                              accessibilityHint="Opens modal to request overtime hours"
                             >
                               <MaterialCommunityIcons
                                 name="clock-plus-outline"
                                 size={14}
-                                color="#8B5CF6"
+                                color={Colors.purple}
                               />
                               <Text style={styles.addOvertimeButtonText}>
                                 Add Overtime
@@ -858,7 +914,7 @@ export default function EmployeeDashboard() {
                                 <Text
                                   style={[
                                     styles.breakTimeValue,
-                                    { color: "#1E40AF" },
+                                    { color: StatusColors.info.text },
                                   ]}
                                 >
                                   {formatTime(
@@ -886,12 +942,12 @@ export default function EmployeeDashboard() {
                                 <Feather
                                   name="message-circle"
                                   size={14}
-                                  color="#1E40AF"
+                                  color={StatusColors.info.text}
                                 />
                                 <Text
                                   style={[
                                     styles.breakReasonLabel,
-                                    { color: "#1E40AF" },
+                                    { color: StatusColors.info.text },
                                   ]}
                                 >
                                   Reason
@@ -900,7 +956,7 @@ export default function EmployeeDashboard() {
                               <Text
                                 style={[
                                   styles.breakReasonText,
-                                  { color: "#1E3A8A" },
+                                  { color: StatusColors.info.text },
                                 ]}
                               >
                                 {upcomingBreak.reason}
@@ -913,20 +969,20 @@ export default function EmployeeDashboard() {
                             style={[
                               styles.breakPendingFooter,
                               {
-                                backgroundColor: "#DBEAFE",
-                                borderColor: "#93C5FD",
+                                backgroundColor: StatusColors.info.background,
+                                borderColor: StatusColors.info.border,
                               },
                             ]}
                           >
                             <MaterialCommunityIcons
                               name="information-outline"
                               size={16}
-                              color="#1E40AF"
+                              color={StatusColors.info.text}
                             />
                             <Text
                               style={[
                                 styles.breakPendingFooterText,
-                                { color: "#1E40AF" },
+                                { color: StatusColors.info.text },
                               ]}
                             >
                               You can end the break once it starts
@@ -958,7 +1014,7 @@ export default function EmployeeDashboard() {
                                 <Text
                                   style={[
                                     styles.breakTimeValue,
-                                    { color: "#065F46" },
+                                    { color: StatusColors.approved.text },
                                   ]}
                                 >
                                   {formatTime(
@@ -978,7 +1034,7 @@ export default function EmployeeDashboard() {
                                 <Feather
                                   name="message-circle"
                                   size={14}
-                                  color="#78350F"
+                                  color={StatusColors.pending.text}
                                 />
                                 <Text style={styles.breakReasonLabel}>
                                   Reason
@@ -1002,7 +1058,7 @@ export default function EmployeeDashboard() {
                                 <MaterialCommunityIcons
                                   name="coffee-to-go"
                                   size={20}
-                                  color="#FFFFFF"
+                                  color={Colors.textInverse}
                                 />
                               }
                             >
@@ -1015,20 +1071,20 @@ export default function EmployeeDashboard() {
                             style={[
                               styles.breakPendingFooter,
                               {
-                                backgroundColor: "#D1FAE5",
-                                borderColor: "#A7F3D0",
+                                backgroundColor: StatusColors.approved.background,
+                                borderColor: StatusColors.approved.border,
                               },
                             ]}
                           >
                             <MaterialCommunityIcons
                               name="information-outline"
                               size={16}
-                              color="#047857"
+                              color={StatusColors.approved.text}
                             />
                             <Text
                               style={[
                                 styles.breakPendingFooterText,
-                                { color: "#047857" },
+                                { color: StatusColors.approved.text },
                               ]}
                             >
                               End time will be recorded with WiFi verification
@@ -1086,7 +1142,7 @@ export default function EmployeeDashboard() {
                                 <Feather
                                   name="message-circle"
                                   size={14}
-                                  color="#78350F"
+                                  color={StatusColors.pending.text}
                                 />
                                 <Text style={styles.breakReasonLabel}>
                                   Reason
@@ -1103,7 +1159,7 @@ export default function EmployeeDashboard() {
                             <MaterialCommunityIcons
                               name="shield-check-outline"
                               size={16}
-                              color="#92400E"
+                              color={StatusColors.pending.text}
                             />
                             <Text style={styles.breakPendingFooterText}>
                               Awaiting HR review and approval
@@ -1117,6 +1173,9 @@ export default function EmployeeDashboard() {
                           activeOpacity={0.7}
                           onPress={() => setShowBreakRequestModal(true)}
                           style={styles.breakRequestButton}
+                          accessibilityLabel="Request a break"
+                          accessibilityRole="button"
+                          accessibilityHint="Opens modal to request a break from work"
                         >
                           <MaterialCommunityIcons
                             name="coffee-outline"
@@ -1133,144 +1192,179 @@ export default function EmployeeDashboard() {
                 </>
               )}
             </View>
-          </View>
+          </Animated.View>
 
           {/* Quick Links Section */}
-          <View style={styles.modernSection}>
+          <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.modernSection}>
             <View style={styles.modernSectionHeader}>
               <Text style={styles.modernSectionTitle}>Quick Links</Text>
             </View>
 
             <View style={styles.quickActionsGrid}>
-              <TouchableOpacity
-                style={styles.quickActionItem}
-                onPress={() => router.push("/(employee)/salary")}
-                activeOpacity={0.6}
-              >
-                <View
-                  style={[
-                    styles.quickActionIcon,
-                    { backgroundColor: "#fef3c7" },
-                  ]}
+              <Animated.View entering={FadeInDown.delay(200).springify()}>
+                <TouchableOpacity
+                  style={styles.quickActionItem}
+                  onPress={() => router.push("/(employee)/salary")}
+                  activeOpacity={PressOpacity.subtle}
+                  accessibilityLabel="View salary information"
+                  accessibilityRole="button"
                 >
-                  <MaterialCommunityIcons
-                    name="wallet"
-                    size={22}
-                    color="#f59e0b"
-                  />
-                </View>
-                <Text style={styles.quickActionLabel}>Salary</Text>
-              </TouchableOpacity>
+                  <View
+                    style={[
+                      styles.quickActionIcon,
+                      { backgroundColor: StatusColors.pending.background },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name="wallet"
+                      size={22}
+                      color={Colors.warning}
+                    />
+                  </View>
+                  <Text style={styles.quickActionLabel}>Salary</Text>
+                </TouchableOpacity>
+              </Animated.View>
 
-              <TouchableOpacity
-                style={styles.quickActionItem}
-                onPress={() => router.push("/(employee)/leave")}
-                activeOpacity={0.6}
-              >
-                <View
-                  style={[
-                    styles.quickActionIcon,
-                    { backgroundColor: "#fce7f3" },
-                  ]}
+              <Animated.View entering={FadeInDown.delay(250).springify()}>
+                <TouchableOpacity
+                  style={styles.quickActionItem}
+                  onPress={() => router.push("/(employee)/leave")}
+                  activeOpacity={PressOpacity.subtle}
+                  accessibilityLabel="Manage leave requests"
+                  accessibilityRole="button"
                 >
-                  <MaterialCommunityIcons
-                    name="beach"
-                    size={22}
-                    color="#ec4899"
-                  />
-                </View>
-                <Text style={styles.quickActionLabel}>Leave</Text>
-              </TouchableOpacity>
+                  <View
+                    style={[
+                      styles.quickActionIcon,
+                      { backgroundColor: Colors.pinkLight },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name="beach"
+                      size={22}
+                      color={Colors.pink}
+                    />
+                  </View>
+                  <Text style={styles.quickActionLabel}>Leave</Text>
+                </TouchableOpacity>
+              </Animated.View>
 
-              <TouchableOpacity
-                style={styles.quickActionItem}
-                onPress={() => router.push("/(employee)/breaks")}
-                activeOpacity={0.6}
-              >
-                <View
-                  style={[
-                    styles.quickActionIcon,
-                    { backgroundColor: "#cffafe" },
-                  ]}
+              <Animated.View entering={FadeInDown.delay(300).springify()}>
+                <TouchableOpacity
+                  style={styles.quickActionItem}
+                  onPress={() => router.push("/(employee)/breaks")}
+                  activeOpacity={PressOpacity.subtle}
+                  accessibilityLabel="View break history"
+                  accessibilityRole="button"
                 >
-                  <MaterialCommunityIcons
-                    name="coffee"
-                    size={22}
-                    color="#0891b2"
-                  />
-                </View>
-                <Text style={styles.quickActionLabel}>Breaks</Text>
-              </TouchableOpacity>
+                  <View
+                    style={[
+                      styles.quickActionIcon,
+                      { backgroundColor: Colors.cyanLight },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name="coffee"
+                      size={22}
+                      color={Colors.cyan}
+                    />
+                  </View>
+                  <Text style={styles.quickActionLabel}>Breaks</Text>
+                </TouchableOpacity>
+              </Animated.View>
 
-              <TouchableOpacity
-                style={styles.quickActionItem}
-                onPress={() =>
-                  router.push("/(employee)/change-employer" as Href)
-                }
-                activeOpacity={0.6}
-              >
-                <View
-                  style={[
-                    styles.quickActionIcon,
-                    { backgroundColor: "#dbeafe" },
-                  ]}
+              <Animated.View entering={FadeInDown.delay(350).springify()}>
+                <TouchableOpacity
+                  style={styles.quickActionItem}
+                  onPress={() =>
+                    router.push("/(employee)/change-employer" as Href)
+                  }
+                  activeOpacity={PressOpacity.subtle}
+                  accessibilityLabel="Change employer"
+                  accessibilityRole="button"
                 >
-                  <MaterialCommunityIcons
-                    name="swap-horizontal"
-                    size={22}
-                    color="#2563eb"
-                  />
-                </View>
-                <Text style={styles.quickActionLabel}>Change Employer</Text>
-              </TouchableOpacity>
+                  <View
+                    style={[
+                      styles.quickActionIcon,
+                      { backgroundColor: StatusColors.info.background },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name="swap-horizontal"
+                      size={22}
+                      color={Colors.infoDark}
+                    />
+                  </View>
+                  <Text style={styles.quickActionLabel}>Change Employer</Text>
+                </TouchableOpacity>
+              </Animated.View>
 
-              <TouchableOpacity
-                style={styles.quickActionItem}
-                onPress={() =>
-                  router.push("/(employee)/search-employer" as Href)
-                }
-                activeOpacity={0.6}
-              >
-                <View
-                  style={[
-                    styles.quickActionIcon,
-                    { backgroundColor: "#e0e7ff" },
-                  ]}
+              <Animated.View entering={FadeInDown.delay(400).springify()}>
+                <TouchableOpacity
+                  style={styles.quickActionItem}
+                  onPress={() =>
+                    router.push("/(employee)/search-employer" as Href)
+                  }
+                  activeOpacity={PressOpacity.subtle}
+                  accessibilityLabel="Search for employer"
+                  accessibilityRole="button"
                 >
-                  <MaterialCommunityIcons
-                    name="magnify"
-                    size={22}
-                    color="#6366f1"
-                  />
-                </View>
-                <Text style={styles.quickActionLabel}>Search Employer</Text>
-              </TouchableOpacity>
+                  <View
+                    style={[
+                      styles.quickActionIcon,
+                      { backgroundColor: Colors.indigoLight },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name="magnify"
+                      size={22}
+                      color={Colors.indigo}
+                    />
+                  </View>
+                  <Text style={styles.quickActionLabel}>Search Employer</Text>
+                </TouchableOpacity>
+              </Animated.View>
 
-              <TouchableOpacity
-                style={styles.quickActionItem}
-                onPress={() =>
-                  router.push("/(employee)/employment-history" as Href)
-                }
-                activeOpacity={0.6}
-              >
-                <View
-                  style={[
-                    styles.quickActionIcon,
-                    { backgroundColor: "#f3e8ff" },
-                  ]}
+              <Animated.View entering={FadeInDown.delay(450).springify()}>
+                <TouchableOpacity
+                  style={styles.quickActionItem}
+                  onPress={() =>
+                    router.push("/(employee)/employment-history" as Href)
+                  }
+                  activeOpacity={PressOpacity.subtle}
+                  accessibilityLabel="View employment history"
+                  accessibilityRole="button"
                 >
-                  <Ionicons name="time" size={22} color="#a855f7" />
-                </View>
-                <Text style={styles.quickActionLabel}>History</Text>
-              </TouchableOpacity>
+                  <View
+                    style={[
+                      styles.quickActionIcon,
+                      { backgroundColor: Colors.purpleLight },
+                    ]}
+                  >
+                    <Ionicons name="time" size={22} color={Colors.purple} />
+                  </View>
+                  <Text style={styles.quickActionLabel}>History</Text>
+                </TouchableOpacity>
+              </Animated.View>
             </View>
-          </View>
+          </Animated.View>
+
+          {/* Feature Banner - Glass Variant */}
+          <Animated.View entering={FadeInDown.delay(250).springify()} style={styles.bannerSlot}>
+            <MarketingBanner
+              variant="glass"
+              title="Salary Insights"
+              subtitle="Track your earnings and view payment history"
+              ctaText="View Details"
+              onPress={() => router.push("/(employee)/salary")}
+            />
+          </Animated.View>
 
           {/* Monthly Summary */}
-          <View style={styles.modernSection}>
+          <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.modernSection}>
             <View style={styles.modernSectionHeader}>
               <Text style={styles.modernSectionTitle}>
-                This Month's Summary
+                This Month&apos;s Summary
               </Text>
             </View>
 
@@ -1321,37 +1415,59 @@ export default function EmployeeDashboard() {
                 </View>
               </View>
             )}
-          </View>
+          </Animated.View>
 
-          {/* Monthly Earnings */}
-          {user?.base_salary != null && user.base_salary > 0 && (
-            <View style={styles.modernSection}>
+          {/* Calendar Heatmap */}
+          {monthlySummary?.records && monthlySummary.records.length > 0 && (
+            <Animated.View entering={FadeInDown.delay(350).springify()} style={styles.modernSection}>
               <View style={styles.modernSectionHeader}>
                 <Text style={styles.modernSectionTitle}>
-                  This Month's Earnings
+                  Attendance Calendar
                 </Text>
               </View>
 
-              <View style={styles.card}>
-                {loadingEarnings ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color={Colors.primary} />
-                  </View>
-                ) : (
-                  <SalaryProgressCard
-                    earnedSalary={earnings?.earned_salary || 0}
-                    baseSalary={user.base_salary || 0}
-                    hoursWorked={earnings?.total_hours_worked || 0}
-                    expectedHours={earnings?.expected_hours || 0}
-                    compact={false}
-                  />
-                )}
-              </View>
-            </View>
+              <MiniCalendarHeatmap
+                records={monthlySummary.records}
+                month={new Date().getMonth()}
+                year={new Date().getFullYear()}
+              />
+            </Animated.View>
           )}
 
+          {/* Monthly Earnings */}
+          {user?.base_salary != null && user.base_salary > 0 && (
+            <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.modernSection}>
+              <View style={styles.modernSectionHeader}>
+                <Text style={styles.modernSectionTitle}>
+                  This Month&apos;s Earnings
+                </Text>
+              </View>
+
+              {loadingEarnings ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                </View>
+              ) : (
+                <CircularHoursProgress
+                  hoursWorked={earnings?.total_hours_worked || 0}
+                  expectedHours={earnings?.expected_hours || 0}
+                />
+              )}
+            </Animated.View>
+          )}
+
+          {/* Placeholder Banner - Coming Soon */}
+          <Animated.View entering={FadeInDown.delay(450).springify()} style={styles.bannerSlot}>
+            <PlaceholderBanner
+              title="Documents Hub"
+              subtitle="Upload and manage your documents securely"
+              icon="document-text-outline"
+              gradientColors={[Colors.indigo, Colors.purple]}
+            />
+          </Animated.View>
+
           {/* Latest Salary */}
-          <View style={styles.modernSection}>
+          <Animated.View entering={FadeInDown.delay(500).springify()} style={styles.modernSection}>
             <View style={styles.modernSectionHeader}>
               <Text style={styles.modernSectionTitle}>Latest Salary</Text>
             </View>
@@ -1430,7 +1546,7 @@ export default function EmployeeDashboard() {
                 </Text>
               </View>
             )}
-          </View>
+          </Animated.View>
         </View>
       </ScrollView>
 
@@ -1515,8 +1631,8 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     gap: 6,
     backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 6,
     borderRadius: BorderRadius.full,
     marginTop: Spacing.xs,
   },
@@ -1560,7 +1676,7 @@ const styles = StyleSheet.create({
     minHeight: 84,
     borderWidth: 1,
     borderColor: "rgba(0,0,0,0.06)",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: Colors.background,
     ...Shadows.sm,
   },
   heroMetricPrimary: {
@@ -1601,6 +1717,31 @@ const styles = StyleSheet.create({
   content: {
     gap: Spacing["lg"],
   },
+  bannerSlot: {
+    marginHorizontal: -Spacing["2xl"],
+  },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.errorLight,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    gap: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.error + "30",
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "500",
+    color: Colors.errorDark,
+  },
+  retryText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.error,
+  },
   modernSection: {
     gap: Spacing["md"],
   },
@@ -1610,6 +1751,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: Spacing["sm"],
   },
+  headerBadgesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
   modernSectionTitle: {
     fontSize: 20,
     fontWeight: "700",
@@ -1617,7 +1763,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: Colors.background,
     borderRadius: 14,
     padding: Spacing["md"],
     borderWidth: 1,
@@ -1642,7 +1788,7 @@ const styles = StyleSheet.create({
   liveText: {
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.semibold,
-    color: "#065F46",
+    color: StatusColors.approved.text,
   },
   loadingContainer: {
     paddingVertical: Spacing["2xl"],
@@ -1650,19 +1796,20 @@ const styles = StyleSheet.create({
   },
   attendanceInfo: {
     flexDirection: "row",
-    gap: 8,
-    marginBottom: 10,
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   timeCard: {
     flex: 1,
     flexDirection: "column",
     alignItems: "center",
-    backgroundColor: "#FAFAFA",
-    padding: 10,
-    borderRadius: 10,
-    gap: 4,
+    backgroundColor: Colors.backgroundSecondary,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.xs,
     borderWidth: 1,
     borderColor: "rgba(0,0,0,0.06)",
+    ...Shadows.xs,
   },
   timeCardContent: {
     alignItems: "center",
@@ -1687,7 +1834,7 @@ const styles = StyleSheet.create({
   overtimeIndicator: {
     fontSize: 10,
     fontWeight: "600",
-    color: "#8B5CF6",
+    color: Colors.purple,
     marginTop: 1,
   },
   emptyStateContainer: {
@@ -1780,7 +1927,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-around",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: Colors.background,
     borderRadius: 16,
     paddingVertical: 18,
     paddingHorizontal: Spacing.lg,
@@ -1857,12 +2004,13 @@ const styles = StyleSheet.create({
   },
   nonWorkingDayContainer: {
     backgroundColor: StatusColors.pending.background,
-    padding: 20,
-    borderRadius: 12,
+    padding: Spacing.xl,
+    borderRadius: BorderRadius.lg,
     alignItems: "center",
-    gap: 8,
+    gap: Spacing.sm,
     borderWidth: 1,
     borderColor: StatusColors.pending.border,
+    ...Shadows.sm,
   },
   nonWorkingDayTitle: {
     fontSize: 16,
@@ -1884,16 +2032,17 @@ const styles = StyleSheet.create({
   },
   breakRequestButton: {
     backgroundColor: StatusColors.pending.background,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.md,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 6,
-    marginTop: 8,
+    marginTop: Spacing.sm,
     borderWidth: 1,
     borderColor: StatusColors.pending.border,
+    ...Shadows.xs,
   },
   breakRequestButtonDisabled: {
     backgroundColor: Colors.gray100,
@@ -2022,8 +2171,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   breakTimeDisplay: {
-    padding: 16,
-    gap: 12,
+    padding: Spacing.lg,
+    gap: Spacing.md,
   },
   breakTimeMain: {
     flexDirection: "row",
@@ -2156,12 +2305,12 @@ const styles = StyleSheet.create({
   },
   quickActionItem: {
     width: "31%",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: Spacing["sm"],
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.xl,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.sm,
     alignItems: "center",
-    gap: 8,
+    gap: Spacing.sm,
     borderWidth: 1,
     borderColor: "rgba(0,0,0,0.08)",
     ...Shadows.xs,
@@ -2210,30 +2359,32 @@ const styles = StyleSheet.create({
   },
   // Overtime styles
   addOvertimeButton: {
-    backgroundColor: "#FAF5FF",
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
+    backgroundColor: StatusColors.overtime.background,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.md,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 6,
-    marginTop: 8,
+    marginTop: Spacing.sm,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
+    borderColor: StatusColors.overtime.border,
+    ...Shadows.xs,
   },
   addOvertimeButtonText: {
-    color: "#8B5CF6",
+    color: Colors.purple,
     fontSize: 13,
     fontWeight: "600",
   },
   overtimeDisplayCard: {
-    backgroundColor: "#FAF5FF",
-    padding: 10,
-    borderRadius: 10,
+    backgroundColor: StatusColors.overtime.background,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
-    marginTop: 8,
+    borderColor: StatusColors.overtime.border,
+    marginTop: Spacing.sm,
+    ...Shadows.xs,
   },
   overtimeDisplayHeader: {
     flexDirection: "row",
@@ -2243,17 +2394,17 @@ const styles = StyleSheet.create({
   overtimeDisplayLabel: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#8B5CF6",
+    color: Colors.purple,
   },
   overtimeDisplayValue: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#6B21A8",
+    color: StatusColors.overtime.text,
     marginLeft: "auto",
   },
   overtimeDisplayReason: {
     fontSize: 12,
-    color: "#7C3AED",
+    color: Colors.purple,
     marginTop: 4,
   },
   editOvertimeButton: {
@@ -2263,37 +2414,37 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 6,
     paddingHorizontal: 12,
-    backgroundColor: "#EDE9FE",
+    backgroundColor: Colors.indigoLight,
     borderRadius: 8,
   },
   editOvertimeButtonText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#8B5CF6",
+    color: Colors.purple,
   },
   // Overtime Pending Styles
   overtimePendingCard: {
-    backgroundColor: "#FFFBEB",
+    backgroundColor: StatusColors.pending.background,
     borderRadius: 12,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: "#FDE68A",
+    borderColor: StatusColors.pending.border,
     overflow: "hidden",
   },
   overtimePendingHeader: {
-    backgroundColor: "#FEF3C7",
+    backgroundColor: StatusColors.pending.background,
     paddingVertical: 8,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#FDE68A",
+    borderBottomColor: StatusColors.pending.border,
   },
   overtimePendingLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#92400E",
+    color: StatusColors.pending.text,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
@@ -2309,15 +2460,15 @@ const styles = StyleSheet.create({
   overtimePendingHours: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#92400E",
+    color: StatusColors.pending.text,
   },
   overtimePendingReason: {
     fontSize: 13,
-    color: "#B45309",
+    color: StatusColors.pending.text,
     marginTop: 4,
   },
   overtimePendingFooter: {
-    backgroundColor: "#FDE68A",
+    backgroundColor: StatusColors.pending.border,
     paddingVertical: 8,
     paddingHorizontal: 12,
     flexDirection: "row",
@@ -2328,31 +2479,31 @@ const styles = StyleSheet.create({
   overtimePendingFooterText: {
     fontSize: 11,
     fontWeight: "600",
-    color: "#92400E",
+    color: StatusColors.pending.text,
   },
   // Overtime Rejected Styles
   overtimeRejectedCard: {
-    backgroundColor: "#FEF2F2",
+    backgroundColor: StatusColors.rejected.background,
     borderRadius: 12,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: "#FECACA",
+    borderColor: StatusColors.rejected.border,
     overflow: "hidden",
   },
   overtimeRejectedHeader: {
-    backgroundColor: "#FEE2E2",
+    backgroundColor: StatusColors.rejected.background,
     paddingVertical: 8,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     borderBottomWidth: 1,
-    borderBottomColor: "#FECACA",
+    borderBottomColor: StatusColors.rejected.border,
   },
   overtimeRejectedLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#991B1B",
+    color: StatusColors.rejected.text,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
@@ -2362,11 +2513,11 @@ const styles = StyleSheet.create({
   overtimeRejectedHours: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#991B1B",
+    color: StatusColors.rejected.text,
   },
   overtimeRejectedReason: {
     fontSize: 13,
-    color: "#B91C1C",
+    color: Colors.errorDark,
     marginTop: 6,
     fontStyle: "italic",
   },

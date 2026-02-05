@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,12 +11,13 @@ import {
   StatusBar,
   ScrollView,
 } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useAlert } from '@/hooks/useAlert';
 import { Stack } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/hooks/auth/useAuth';
-import { usePendingJoinRequests, useAllJoinRequests } from '@/hooks/queries/useEmployerRequests';
+import { useAllJoinRequests } from '@/hooks/queries/useEmployerRequests';
 import {
   useApproveJoinRequest,
   useRejectJoinRequest,
@@ -40,16 +41,21 @@ export default function JoinRequestsScreen() {
   const [reviewAction, setReviewAction] = useState<'approve' | 'reject' | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
 
-  // Fetch requests based on filter
+  // Use a single hook to avoid conditional hook calls (violates Rules of Hooks)
+  // This approach always calls the same hook and uses filters parameter
+  // useMemo stabilizes the filter object to prevent React Compiler cache size issues
+  const statusFilterParam = useMemo(
+    () => (statusFilter === 'all' ? undefined : { status: statusFilter }),
+    [statusFilter]
+  );
+
   const {
     data: requests,
     isLoading,
     error: fetchError,
     refetch,
     isRefetching,
-  } = statusFilter === 'pending'
-    ? usePendingJoinRequests(organizationId)
-    : useAllJoinRequests(organizationId, statusFilter === 'all' ? undefined : { status: statusFilter });
+  } = useAllJoinRequests(organizationId, statusFilterParam);
 
   // Mutations
   const approveMutation = useApproveJoinRequest({
@@ -353,7 +359,7 @@ export default function JoinRequestsScreen() {
         }
       >
         {/* Filter Chips */}
-        <View style={styles.filtersContainer}>
+        <Animated.View entering={FadeInDown.delay(50).springify()} style={styles.filtersContainer}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -364,13 +370,15 @@ export default function JoinRequestsScreen() {
             {renderFilterButton('rejected', 'Rejected')}
             {renderFilterButton('all', 'All')}
           </ScrollView>
-        </View>
+        </Animated.View>
 
         {/* Requests List */}
         <View style={styles.requestsContainer}>
           {(requests as any)?.length > 0 ? (
-            (requests as any).map((item: any) => (
-              <View key={item.id}>{renderRequestCard({ item })}</View>
+            (requests as any).map((item: any, index: number) => (
+              <Animated.View key={item.id} entering={FadeInDown.delay(100 + index * 80).springify()}>
+                {renderRequestCard({ item })}
+              </Animated.View>
             ))
           ) : (
             renderEmptyState()

@@ -63,7 +63,8 @@ function TabItem({ label, isFocused, onPress, onLongPress, icon, isDark }: TabIt
   });
 
   const handlePress = () => {
-    if (!isFocused && Platform.OS === 'ios') {
+    // Extend haptics to Android (not just iOS)
+    if (!isFocused && Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     onPress();
@@ -71,8 +72,10 @@ function TabItem({ label, isFocused, onPress, onLongPress, icon, isDark }: TabIt
 
   return (
     <Pressable
-      accessibilityRole="button"
-      accessibilityState={isFocused ? { selected: true } : {}}
+      accessibilityRole="tab"
+      accessibilityLabel={`${label} tab`}
+      accessibilityState={{ selected: isFocused }}
+      accessibilityHint={`Navigate to ${label}`}
       onPress={handlePress}
       onLongPress={onLongPress}
     >

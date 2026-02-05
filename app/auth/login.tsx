@@ -17,7 +17,7 @@ import { Text } from "@/components/ui/Text";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { Link, router } from "expo-router";
 import { useSignIn } from "@/hooks/mutations/useAuthMutations";
-import { Colors, BorderRadius, Shadows, Spacing } from "@/constants/theme";
+import { Colors, BorderRadius, Shadows, Spacing, Gradients } from "@/constants/theme";
 import { GoogleSignInButton } from "@/components/ui/GoogleSignInButton";
 import { IS_GOOGLE_CONFIGURED } from "@/hooks/auth/useGoogleAuth";
 
@@ -27,6 +27,8 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
   const { error } = useAlert();
 
   const signInMutation = useSignIn({
@@ -53,7 +55,7 @@ export default function LoginScreen() {
 
       {/* Gradient Header */}
       <LinearGradient
-        colors={["#E67300", "#FF9933", "#FFB366"]}
+        colors={Gradients.saffronHero}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.headerGradient}
@@ -84,11 +86,11 @@ export default function LoginScreen() {
             <Text style={styles.instructionText}>Sign in to continue</Text>
 
             <View style={styles.form}>
-              <View style={styles.inputContainer}>
+              <View style={[styles.inputContainer, emailFocused && styles.inputContainerFocused]}>
                 <MaterialCommunityIcons
                   name="email-outline"
                   size={20}
-                  color={Colors.primary}
+                  color={emailFocused ? Colors.primary : Colors.gray400}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -100,14 +102,18 @@ export default function LoginScreen() {
                   autoCapitalize="none"
                   keyboardType="email-address"
                   editable={!signInMutation.isPending}
+                  onFocus={() => setEmailFocused(true)}
+                  onBlur={() => setEmailFocused(false)}
+                  accessibilityLabel="Email address"
+                  accessibilityHint="Enter your email address to sign in"
                 />
               </View>
 
-              <View style={styles.inputContainer}>
+              <View style={[styles.inputContainer, passwordFocused && styles.inputContainerFocused]}>
                 <MaterialCommunityIcons
                   name="lock-outline"
                   size={20}
-                  color={Colors.primary}
+                  color={passwordFocused ? Colors.primary : Colors.gray400}
                   style={styles.inputIcon}
                 />
                 <TextInput
@@ -118,10 +124,17 @@ export default function LoginScreen() {
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                   editable={!signInMutation.isPending}
+                  onFocus={() => setPasswordFocused(true)}
+                  onBlur={() => setPasswordFocused(false)}
+                  accessibilityLabel="Password"
+                  accessibilityHint="Enter your password to sign in"
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
                   style={styles.eyeButton}
+                  accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+                  accessibilityRole="button"
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   <Ionicons
                     name={showPassword ? "eye-off-outline" : "eye-outline"}
@@ -135,6 +148,9 @@ export default function LoginScreen() {
                 style={[styles.button, signInMutation.isPending && styles.buttonDisabled]}
                 onPress={handleLogin}
                 disabled={signInMutation.isPending}
+                accessibilityLabel={signInMutation.isPending ? "Logging in, please wait" : "Login"}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: signInMutation.isPending }}
               >
                 <LinearGradient
                   colors={[Colors.primary, Colors.primaryDark]}
@@ -149,7 +165,12 @@ export default function LoginScreen() {
               </TouchableOpacity>
 
               <Link href="/auth/forgot-password" asChild>
-                <TouchableOpacity style={styles.linkButton}>
+                <TouchableOpacity
+                  style={styles.linkButton}
+                  accessibilityLabel="Forgot Password"
+                  accessibilityRole="link"
+                  accessibilityHint="Navigate to password reset page"
+                >
                   <Text style={styles.linkText}>Forgot Password?</Text>
                 </TouchableOpacity>
               </Link>
@@ -172,7 +193,12 @@ export default function LoginScreen() {
               )}
 
               <Link href="/auth/signup" asChild>
-                <TouchableOpacity style={styles.secondaryButton}>
+                <TouchableOpacity
+                  style={styles.secondaryButton}
+                  accessibilityLabel="Create New Account"
+                  accessibilityRole="link"
+                  accessibilityHint="Navigate to signup page to create a new account"
+                >
                   <MaterialCommunityIcons
                     name="account-plus-outline"
                     size={20}
@@ -211,7 +237,7 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 24,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: Colors.textInverse,
     textShadowColor: "rgba(0, 0, 0, 0.2)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
@@ -231,7 +257,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: Colors.background,
     borderRadius: 20,
     padding: 28,
     borderWidth: 1,
@@ -258,12 +284,16 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: "rgba(0,0,0,0.08)",
     borderRadius: 14,
     marginBottom: 16,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: Colors.backgroundSecondary,
     paddingHorizontal: 16,
+  },
+  inputContainerFocused: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.background,
   },
   inputIcon: {
     marginRight: 12,
@@ -292,7 +322,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    color: "#FFFFFF",
+    color: Colors.textInverse,
     fontSize: 16,
     fontWeight: "700",
   },
@@ -331,7 +361,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: Colors.background,
   },
   secondaryButtonText: {
     color: Colors.primary,

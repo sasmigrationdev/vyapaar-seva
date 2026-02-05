@@ -29,11 +29,12 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Text } from "@/components/ui/Text";
+import { Colors, Spacing, BorderRadius, Shadows, StatusColors } from "@/constants/theme";
 import { useAlert } from "@/hooks/useAlert";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -626,7 +627,7 @@ export default function MarkAttendanceModal({
               {existingRecord ? "Edit Attendance" : "Mark Attendance"}
             </Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="#64748B" />
+              <Ionicons name="close" size={24} color={Colors.gray500} />
             </TouchableOpacity>
           </View>
 
@@ -659,7 +660,7 @@ export default function MarkAttendanceModal({
                     <MaterialCommunityIcons
                       name="account-outline"
                       size={20}
-                      color="#64748B"
+                      color={Colors.gray500}
                     />
                     <Text style={styles.dropdownButtonText}>
                       {selectedEmployee
@@ -678,7 +679,7 @@ export default function MarkAttendanceModal({
                       <MaterialCommunityIcons
                         name="account-outline"
                         size={20}
-                        color="#64748B"
+                        color={Colors.gray500}
                       />
                       <Text
                         style={[
@@ -695,20 +696,20 @@ export default function MarkAttendanceModal({
                           showEmployeeDropdown ? "chevron-up" : "chevron-down"
                         }
                         size={20}
-                        color="#64748B"
+                        color={Colors.gray500}
                       />
                     </TouchableOpacity>
 
                     {showEmployeeDropdown && (
                       <View style={styles.dropdown}>
                         <View style={styles.searchBox}>
-                          <Ionicons name="search" size={18} color="#64748B" />
+                          <Ionicons name="search" size={18} color={Colors.gray500} />
                           <TextInput
                             style={styles.searchInput}
                             placeholder="Search employee..."
                             value={searchTerm}
                             onChangeText={setSearchTerm}
-                            placeholderTextColor="#94A3B8"
+                            placeholderTextColor={Colors.textTertiary}
                           />
                         </View>
                         <ScrollView
@@ -762,7 +763,7 @@ export default function MarkAttendanceModal({
             {/* Loading indicator while fetching attendance data */}
             {isFetchingAttendance && formData.userId && formData.date && (
               <View style={styles.loadingCard}>
-                <ActivityIndicator size="small" color="#6366F1" />
+                <ActivityIndicator size="small" color={Colors.indigo} />
                 <Text style={styles.loadingText}>Checking existing attendance...</Text>
               </View>
             )}
@@ -776,7 +777,7 @@ export default function MarkAttendanceModal({
               label="Check-in Time"
               required
               iconName="log-in-outline"
-              iconColor="#10B981"
+              iconColor={Colors.success}
             />
 
             {/* Check-out Time */}
@@ -787,7 +788,7 @@ export default function MarkAttendanceModal({
               }
               label="Check-out Time"
               iconName="log-out-outline"
-              iconColor="#EF4444"
+              iconColor={Colors.error}
             />
 
             {/* Different Check-out Date Toggle */}
@@ -814,7 +815,7 @@ export default function MarkAttendanceModal({
                     }
                     size={22}
                     color={
-                      formData.useSeparateCheckOutDate ? "#6366F1" : "#94A3B8"
+                      formData.useSeparateCheckOutDate ? Colors.indigo : Colors.textTertiary
                     }
                   />
                   <Text style={styles.toggleText}>
@@ -824,7 +825,7 @@ export default function MarkAttendanceModal({
                 <Ionicons
                   name="information-circle-outline"
                   size={18}
-                  color="#94A3B8"
+                  color={Colors.textTertiary}
                 />
               </TouchableOpacity>
             )}
@@ -848,7 +849,7 @@ export default function MarkAttendanceModal({
                 <MaterialCommunityIcons
                   name="coffee-outline"
                   size={20}
-                  color="#F59E0B"
+                  color={Colors.warning}
                 />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.previewLabel}>
@@ -878,7 +879,7 @@ export default function MarkAttendanceModal({
                     }
                     size={20}
                     color={
-                      hoursPreview.regularHours < 0 ? "#EF4444" : "#6366F1"
+                      hoursPreview.regularHours < 0 ? Colors.error : Colors.indigo
                     }
                   />
                   <View style={{ flex: 1 }}>
@@ -903,7 +904,7 @@ export default function MarkAttendanceModal({
                     <MaterialCommunityIcons
                       name="clock-plus-outline"
                       size={20}
-                      color="#8B5CF6"
+                      color={Colors.purple}
                     />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.previewLabel}>Overtime Hours</Text>
@@ -920,7 +921,7 @@ export default function MarkAttendanceModal({
                     <MaterialCommunityIcons
                       name="sigma"
                       size={20}
-                      color="#10B981"
+                      color={Colors.success}
                     />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.previewLabel}>
@@ -941,7 +942,7 @@ export default function MarkAttendanceModal({
                 <MaterialCommunityIcons
                   name="clock-plus-outline"
                   size={20}
-                  color="#8B5CF6"
+                  color={Colors.purple}
                 />
                 <Text style={styles.overtimeSectionTitle}>Overtime</Text>
               </View>
@@ -956,7 +957,7 @@ export default function MarkAttendanceModal({
                   <MaterialCommunityIcons
                     name="clock-outline"
                     size={20}
-                    color="#64748B"
+                    color={Colors.gray500}
                   />
                   <TextInput
                     style={styles.input}
@@ -978,7 +979,7 @@ export default function MarkAttendanceModal({
                       }
                     }}
                     keyboardType="decimal-pad"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={Colors.textTertiary}
                   />
                   <Text style={styles.inputSuffix}>hrs</Text>
                 </View>
@@ -993,7 +994,7 @@ export default function MarkAttendanceModal({
                       <MaterialCommunityIcons
                         name="text"
                         size={20}
-                        color="#64748B"
+                        color={Colors.gray500}
                       />
                       <TextInput
                         style={styles.input}
@@ -1002,7 +1003,7 @@ export default function MarkAttendanceModal({
                         onChangeText={(text) =>
                           setFormData({ ...formData, overtimeReason: text })
                         }
-                        placeholderTextColor="#94A3B8"
+                        placeholderTextColor={Colors.textTertiary}
                       />
                     </View>
                   </View>
@@ -1016,7 +1017,7 @@ export default function MarkAttendanceModal({
                   <MaterialCommunityIcons
                     name="calendar-week"
                     size={16}
-                    color="#64748B"
+                    color={Colors.gray500}
                   />
                   <Text style={styles.workingDaysLabel}>Working Days:</Text>
                 </View>
@@ -1035,7 +1036,7 @@ export default function MarkAttendanceModal({
             {/* Off Day Error */}
             {!isSelectedDateWorkingDay && selectedEmployee && (
               <View style={styles.errorCard}>
-                <Ionicons name="close-circle" size={20} color="#EF4444" />
+                <Ionicons name="close-circle" size={20} color={Colors.error} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.errorTitle}>
                     Off Day - Cannot Mark Attendance
@@ -1055,7 +1056,7 @@ export default function MarkAttendanceModal({
                 <MaterialCommunityIcons
                   name="note-text-outline"
                   size={20}
-                  color="#64748B"
+                  color={Colors.gray500}
                   style={styles.textAreaIcon}
                 />
                 <TextInput
@@ -1068,7 +1069,7 @@ export default function MarkAttendanceModal({
                   multiline
                   numberOfLines={3}
                   textAlignVertical="top"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={Colors.textTertiary}
                 />
               </View>
             </View>
@@ -1086,13 +1087,13 @@ export default function MarkAttendanceModal({
             >
               {isLoading &&
               (markMutation.isPending || updateMutation.isPending) ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator size="small" color={Colors.textInverse} />
               ) : (
                 <>
                   <Ionicons
                     name={existingRecord ? "checkmark-circle" : "add-circle"}
                     size={20}
-                    color="#FFFFFF"
+                    color={Colors.textInverse}
                   />
                   <Text style={styles.submitButtonText}>
                     {existingRecord ? "Update Attendance" : "Mark Attendance"}
@@ -1113,10 +1114,10 @@ export default function MarkAttendanceModal({
                 activeOpacity={0.8}
               >
                 {isLoading && deleteMutation.isPending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={Colors.textInverse} />
                 ) : (
                   <>
-                    <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
+                    <Ionicons name="trash-outline" size={20} color={Colors.textInverse} />
                     <Text style={styles.deleteButtonText}>
                       Delete Attendance
                     </Text>
@@ -1142,30 +1143,30 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   modalContainer: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: Colors.background,
+    borderTopLeftRadius: BorderRadius["3xl"],
+    borderTopRightRadius: BorderRadius["3xl"],
     height: "90%",
   },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingHorizontal: Spacing["2xl"],
+    paddingVertical: Spacing.xl,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: Colors.border,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#0F172A",
+    color: Colors.text,
   },
   closeButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: Colors.gray100,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -1173,35 +1174,35 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalContentContainer: {
-    padding: 24,
+    padding: Spacing["2xl"],
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: Spacing.xl,
   },
   label: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#334155",
-    marginBottom: 8,
+    color: Colors.text,
+    marginBottom: Spacing.sm,
   },
   required: {
-    color: "#EF4444",
+    color: Colors.error,
   },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md + 2,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    gap: 12,
+    borderColor: Colors.border,
+    gap: Spacing.md,
   },
   input: {
     flex: 1,
     fontSize: 15,
-    color: "#0F172A",
+    color: Colors.text,
   },
   textAreaWrapper: {
     alignItems: "flex-start",
@@ -1216,80 +1217,76 @@ const styles = StyleSheet.create({
   dropdownButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md + 2,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
-    gap: 12,
+    borderColor: Colors.border,
+    gap: Spacing.md,
   },
   dropdownButtonText: {
     flex: 1,
     fontSize: 15,
-    color: "#0F172A",
+    color: Colors.text,
   },
   dropdownPlaceholder: {
-    color: "#94A3B8",
+    color: Colors.textTertiary,
   },
   dropdownButtonDisabled: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: Colors.gray100,
     opacity: 0.7,
   },
   dropdown: {
-    marginTop: 8,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
+    marginTop: Spacing.sm,
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: Colors.border,
     maxHeight: 250,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+    ...Shadows.lg,
   },
   searchBox: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 12,
+    padding: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
-    gap: 8,
+    borderBottomColor: Colors.border,
+    gap: Spacing.sm,
   },
   searchInput: {
     flex: 1,
     fontSize: 14,
-    color: "#0F172A",
+    color: Colors.text,
   },
   dropdownList: {
     maxHeight: 200,
   },
   dropdownItem: {
-    padding: 12,
+    padding: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
+    borderBottomColor: Colors.gray100,
   },
   dropdownItemName: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#0F172A",
+    color: Colors.text,
     marginBottom: 2,
   },
   dropdownItemId: {
     fontSize: 13,
-    color: "#64748B",
+    color: Colors.gray500,
   },
   submitButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#6366F1",
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginTop: 8,
-    gap: 8,
-    shadowColor: "#6366F1",
+    backgroundColor: Colors.indigo,
+    paddingVertical: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    marginTop: Spacing.sm,
+    gap: Spacing.sm,
+    shadowColor: Colors.indigo,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -1301,18 +1298,18 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: Colors.textInverse,
   },
   deleteButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#EF4444",
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginTop: 12,
-    gap: 8,
-    shadowColor: "#EF4444",
+    backgroundColor: Colors.error,
+    paddingVertical: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    marginTop: Spacing.md,
+    gap: Spacing.sm,
+    shadowColor: Colors.error,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -1324,39 +1321,39 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: Colors.textInverse,
   },
   previewCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 20,
+    gap: Spacing.md,
+    padding: Spacing.md + 2,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.xl,
   },
   previewCardSuccess: {
-    backgroundColor: "#EEF2FF",
+    backgroundColor: Colors.indigoLight,
     borderWidth: 1,
-    borderColor: "#C7D2FE",
+    borderColor: StatusColors.info.border,
   },
   previewCardError: {
-    backgroundColor: "#FEE2E2",
+    backgroundColor: StatusColors.rejected.background,
     borderWidth: 1,
-    borderColor: "#FECACA",
+    borderColor: StatusColors.rejected.border,
   },
   previewLabel: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#64748B",
+    color: Colors.gray500,
     marginBottom: 4,
   },
   previewValue: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#6366F1",
+    color: Colors.indigo,
   },
   previewValueError: {
-    color: "#EF4444",
+    color: Colors.error,
   },
   hoursBreakdownContainer: {
     marginBottom: 20,
@@ -1365,197 +1362,197 @@ const styles = StyleSheet.create({
   breakInfoCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: "#FEF3C7",
+    gap: Spacing.md,
+    padding: Spacing.md + 2,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: StatusColors.pending.background,
     borderWidth: 1,
-    borderColor: "#FDE68A",
+    borderColor: StatusColors.pending.border,
   },
   breakValue: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#92400E",
+    color: StatusColors.pending.text,
   },
   workingDaysInfo: {
-    backgroundColor: "#F8FAFC",
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 16,
+    backgroundColor: Colors.backgroundSecondary,
+    padding: Spacing.md + 2,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.lg,
   },
   workingDaysHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginBottom: 10,
+    gap: Spacing.xs + 2,
+    marginBottom: Spacing.sm + 2,
   },
   workingDaysLabel: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#64748B",
+    color: Colors.gray500,
   },
   workingDaysList: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6,
+    gap: Spacing.xs + 2,
   },
   workingDayChip: {
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    backgroundColor: Colors.background,
+    paddingHorizontal: Spacing.sm + 2,
+    paddingVertical: Spacing.xs + 1,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: Colors.border,
   },
   workingDayText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#334155",
+    color: Colors.text,
   },
   warningCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    backgroundColor: "#FEF3C7",
-    padding: 14,
-    borderRadius: 12,
+    gap: Spacing.md,
+    backgroundColor: StatusColors.pending.background,
+    padding: Spacing.md + 2,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: "#FDE68A",
-    marginBottom: 20,
+    borderColor: StatusColors.pending.border,
+    marginBottom: Spacing.xl,
   },
   warningTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#92400E",
+    color: StatusColors.pending.text,
     marginBottom: 2,
   },
   warningText: {
     fontSize: 12,
-    color: "#78350F",
+    color: StatusColors.pending.text,
   },
   errorCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    backgroundColor: "#FEE2E2",
-    padding: 14,
-    borderRadius: 12,
+    gap: Spacing.md,
+    backgroundColor: StatusColors.rejected.background,
+    padding: Spacing.md + 2,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: "#FECACA",
-    marginBottom: 20,
+    borderColor: StatusColors.rejected.border,
+    marginBottom: Spacing.xl,
   },
   errorTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#991B1B",
+    color: StatusColors.rejected.text,
     marginBottom: 2,
   },
   errorText: {
     fontSize: 12,
-    color: "#991B1B",
+    color: StatusColors.rejected.text,
   },
   checkOutDateToggle: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#F8FAFC",
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 20,
+    backgroundColor: Colors.backgroundSecondary,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md + 2,
+    marginBottom: Spacing.xl,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: Colors.border,
   },
   toggleLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: Spacing.sm + 2,
   },
   toggleText: {
     fontSize: 14,
     fontWeight: "500",
-    color: "#334155",
+    color: Colors.text,
   },
   overtimeSection: {
-    backgroundColor: "#FAF5FF",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
+    backgroundColor: Colors.purpleLight,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    marginBottom: Spacing.xl,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
+    borderColor: StatusColors.overtime.border,
   },
   overtimeSectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 12,
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   overtimeSectionTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#6B21A8",
+    color: StatusColors.overtime.text,
   },
   inputSuffix: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#64748B",
-    marginLeft: 8,
+    color: Colors.gray500,
+    marginLeft: Spacing.sm,
   },
   overtimeInfoCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    backgroundColor: "#FAF5FF",
-    padding: 14,
-    borderRadius: 10,
+    gap: Spacing.md,
+    backgroundColor: Colors.purpleLight,
+    padding: Spacing.md + 2,
+    borderRadius: BorderRadius.md + 2,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
-    marginTop: 8,
+    borderColor: StatusColors.overtime.border,
+    marginTop: Spacing.sm,
   },
   overtimeValue: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#8B5CF6",
+    color: Colors.purple,
   },
   totalHoursCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    backgroundColor: "#ECFDF5",
-    padding: 14,
-    borderRadius: 10,
+    gap: Spacing.md,
+    backgroundColor: StatusColors.approved.background,
+    padding: Spacing.md + 2,
+    borderRadius: BorderRadius.md + 2,
     borderWidth: 1,
-    borderColor: "#A7F3D0",
-    marginTop: 8,
+    borderColor: StatusColors.approved.border,
+    marginTop: Spacing.sm,
   },
   totalValue: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#10B981",
+    color: Colors.success,
   },
   labelRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: Spacing.xs + 2,
   },
   labelHint: {
     fontSize: 11,
     fontWeight: "500",
-    color: "#8B5CF6",
+    color: Colors.purple,
   },
   loadingCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    backgroundColor: "#EEF2FF",
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 20,
+    gap: Spacing.md,
+    backgroundColor: Colors.indigoLight,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md + 2,
+    marginBottom: Spacing.xl,
     borderWidth: 1,
-    borderColor: "#C7D2FE",
+    borderColor: StatusColors.info.border,
   },
   loadingText: {
     fontSize: 13,
     fontWeight: "500",
-    color: "#6366F1",
+    color: Colors.indigo,
   },
 });

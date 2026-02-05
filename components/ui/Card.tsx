@@ -1,13 +1,15 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
   View,
   StyleSheet,
   TouchableOpacity,
   ViewStyle,
-  TouchableOpacityProps,
+  StyleProp,
+  Animated,
+  Pressable,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { Colors, BorderRadius, Shadows, Spacing } from "@/constants/theme";
+import { Colors, BorderRadius, Shadows, Spacing, PressOpacity, AnimationPresets } from "@/constants/theme";
 import { Text } from "./Text";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -16,9 +18,11 @@ type CardVariant = "default" | "elevated" | "outlined" | "gradient";
 interface CardProps {
   children: React.ReactNode;
   variant?: CardVariant;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   onPress?: () => void;
   disabled?: boolean;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 }
 
 export function Card({
@@ -27,7 +31,29 @@ export function Card({
   style,
   onPress,
   disabled = false,
+  accessibilityLabel,
+  accessibilityHint,
 }: CardProps) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: AnimationPresets.pressScale,
+      damping: AnimationPresets.springConfig.damping,
+      stiffness: AnimationPresets.springConfig.stiffness,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      damping: AnimationPresets.springConfig.damping,
+      stiffness: AnimationPresets.springConfig.stiffness,
+      useNativeDriver: true,
+    }).start();
+  };
+
   const cardStyle = [
     styles.card,
     variant === "elevated" && styles.cardElevated,
@@ -50,13 +76,20 @@ export function Card({
 
     if (onPress) {
       return (
-        <TouchableOpacity
+        <Pressable
           onPress={onPress}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
           disabled={disabled}
-          activeOpacity={0.8}
+          accessibilityLabel={accessibilityLabel}
+          accessibilityHint={accessibilityHint}
+          accessibilityRole="button"
+          accessibilityState={{ disabled }}
         >
-          {content}
-        </TouchableOpacity>
+          <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+            {content}
+          </Animated.View>
+        </Pressable>
       );
     }
     return content;
@@ -64,14 +97,20 @@ export function Card({
 
   if (onPress) {
     return (
-      <TouchableOpacity
-        style={cardStyle}
+      <Pressable
         onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
         disabled={disabled}
-        activeOpacity={0.7}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint={accessibilityHint}
+        accessibilityRole="button"
+        accessibilityState={{ disabled }}
       >
-        {children}
-      </TouchableOpacity>
+        <Animated.View style={[cardStyle, { transform: [{ scale: scaleAnim }] }]}>
+          {children}
+        </Animated.View>
+      </Pressable>
     );
   }
 
@@ -88,7 +127,7 @@ interface StatCardProps {
   trend?: "up" | "down" | "neutral";
   trendValue?: string;
   onPress?: () => void;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function StatCard({
@@ -158,7 +197,9 @@ interface ActionCardProps {
   icon: keyof typeof Ionicons.glyphMap;
   iconColor?: string;
   onPress: () => void;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 }
 
 export function ActionCard({
@@ -168,18 +209,57 @@ export function ActionCard({
   iconColor = Colors.secondary,
   onPress,
   style,
+  accessibilityLabel,
+  accessibilityHint,
 }: ActionCardProps) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: AnimationPresets.pressScale,
+      damping: AnimationPresets.springConfig.damping,
+      stiffness: AnimationPresets.springConfig.stiffness,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      damping: AnimationPresets.springConfig.damping,
+      stiffness: AnimationPresets.springConfig.stiffness,
+      useNativeDriver: true,
+    }).start();
+  };
+
   return (
-    <Card variant="elevated" onPress={onPress} style={[styles.actionCard, style]}>
-      <View style={[styles.actionIcon, { backgroundColor: `${iconColor}15` }]}>
-        <Ionicons name={icon} size={28} color={iconColor} />
-      </View>
-      <Text style={styles.actionTitle}>{title}</Text>
-      {description && <Text style={styles.actionDescription}>{description}</Text>}
-      <View style={styles.actionArrow}>
-        <Ionicons name="chevron-forward" size={20} color={Colors.gray400} />
-      </View>
-    </Card>
+    <Pressable
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      accessibilityLabel={accessibilityLabel || title}
+      accessibilityHint={accessibilityHint || `Navigate to ${title}`}
+      accessibilityRole="button"
+    >
+      <Animated.View
+        style={[
+          styles.card,
+          styles.cardElevated,
+          styles.actionCard,
+          style,
+          { transform: [{ scale: scaleAnim }] },
+        ]}
+      >
+        <View style={[styles.actionIcon, { backgroundColor: `${iconColor}15` }]}>
+          <Ionicons name={icon} size={28} color={iconColor} />
+        </View>
+        <Text style={styles.actionTitle}>{title}</Text>
+        {description && <Text style={styles.actionDescription}>{description}</Text>}
+        <View style={styles.actionArrow}>
+          <Ionicons name="chevron-forward" size={20} color={Colors.gray400} />
+        </View>
+      </Animated.View>
+    </Pressable>
   );
 }
 

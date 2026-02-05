@@ -78,6 +78,10 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
       onPress={handlePress}
       disabled={isDisabled}
       activeOpacity={0.7}
+      accessibilityLabel={isLoading ? 'Signing in with Google' : 'Continue with Google'}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled }}
+      accessibilityHint="Sign in using your Google account"
     >
       <View style={styles.content}>
         {isLoading ? (

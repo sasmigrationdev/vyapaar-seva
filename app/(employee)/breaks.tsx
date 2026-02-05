@@ -19,6 +19,8 @@ import { useAuth } from '@/hooks/auth/useAuth';
 import { BreakRequest } from '@/lib/types';
 import { formatDate, formatTime } from '@/lib/utils/date.utils';
 import { Text } from '@/components/ui/Text';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { Colors, Spacing, BorderRadius, Typography, Shadows, StatusColors } from '@/constants/theme';
 
 export default function EmployeeBreaksScreen() {
   const insets = useSafeAreaInsets();
@@ -86,13 +88,13 @@ export default function EmployeeBreaksScreen() {
     const getStatusColor = (status: string) => {
       switch (status) {
         case 'pending':
-          return '#F59E0B';
+          return Colors.warning;
         case 'approved':
-          return '#10B981';
+          return Colors.success;
         case 'rejected':
-          return '#EF4444';
+          return Colors.error;
         default:
-          return '#64748B';
+          return Colors.gray500;
       }
     };
 
@@ -119,7 +121,7 @@ export default function EmployeeBreaksScreen() {
         {/* Header */}
         <View style={styles.cardHeader}>
           <View style={styles.timeContainer}>
-            <MaterialCommunityIcons name="coffee" size={20} color="#6366F1" />
+            <MaterialCommunityIcons name="coffee" size={20} color={Colors.indigo} />
             <Text style={styles.timeText}>
               {item.approved_start_time
                 ? formatTime(new Date(item.approved_start_time))
@@ -157,7 +159,7 @@ export default function EmployeeBreaksScreen() {
         {/* Duration */}
         {item.duration_minutes !== null && item.status === 'completed' && (
           <View style={styles.durationRow}>
-            <Ionicons name="timer-outline" size={16} color="#64748B" />
+            <Ionicons name="timer-outline" size={16} color={Colors.gray500} />
             <Text style={styles.durationText}>
               Duration: {hours > 0 && `${hours}h `}
               {minutes}m
@@ -201,7 +203,7 @@ export default function EmployeeBreaksScreen() {
             headerShown: false,
           }}
         />
-        <ActivityIndicator size="large" color="#6366F1" />
+        <ActivityIndicator size="large" color={Colors.indigo} />
         <Text style={styles.loadingText}>Loading your breaks...</Text>
       </View>
     );
@@ -231,8 +233,8 @@ export default function EmployeeBreaksScreen() {
           <RefreshControl
             refreshing={isFetching}
             onRefresh={refetch}
-            tintColor="#6366F1"
-            colors={['#6366F1']}
+            tintColor={Colors.indigo}
+            colors={[Colors.indigo]}
           />
         }
         showsVerticalScrollIndicator={false}
@@ -241,7 +243,7 @@ export default function EmployeeBreaksScreen() {
       {/* Month Navigation */}
       <View style={styles.dateNavigation}>
         <TouchableOpacity onPress={handlePreviousMonth} style={styles.navButton}>
-          <Ionicons name="chevron-back" size={24} color="#6366F1" />
+          <Ionicons name="chevron-back" size={24} color={Colors.indigo} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -254,11 +256,11 @@ export default function EmployeeBreaksScreen() {
               year: 'numeric',
             })}
           </Text>
-          <Ionicons name="chevron-down" size={16} color="#6366F1" />
+          <Ionicons name="chevron-down" size={16} color={Colors.indigo} />
         </TouchableOpacity>
 
         <TouchableOpacity onPress={handleNextMonth} style={styles.navButton}>
-          <Ionicons name="chevron-forward" size={24} color="#6366F1" />
+          <Ionicons name="chevron-forward" size={24} color={Colors.indigo} />
         </TouchableOpacity>
       </View>
 
@@ -286,7 +288,7 @@ export default function EmployeeBreaksScreen() {
                     }}
                     style={styles.yearButton}
                   >
-                    <Ionicons name="chevron-back" size={20} color="#6366F1" />
+                    <Ionicons name="chevron-back" size={20} color={Colors.indigo} />
                   </TouchableOpacity>
 
                   <Text style={styles.monthPickerYear}>{selectedDate.getFullYear()}</Text>
@@ -299,7 +301,7 @@ export default function EmployeeBreaksScreen() {
                     }}
                     style={styles.yearButton}
                   >
-                    <Ionicons name="chevron-forward" size={20} color="#6366F1" />
+                    <Ionicons name="chevron-forward" size={20} color={Colors.indigo} />
                   </TouchableOpacity>
                 </View>
 
@@ -354,14 +356,14 @@ export default function EmployeeBreaksScreen() {
         <View style={styles.summarySection}>
           <View style={styles.infoRow}>
             <View style={styles.infoItem}>
-              <MaterialCommunityIcons name="coffee" size={18} color="#6366F1" />
+              <MaterialCommunityIcons name="coffee" size={18} color={Colors.indigo} />
               <Text style={styles.infoValue}>{summary.totalBreaks}</Text>
               <Text style={styles.infoLabel}>Total Breaks</Text>
             </View>
             <View style={styles.infoDivider} />
             <View style={styles.infoItem}>
-              <Ionicons name="timer-outline" size={18} color="#3B82F6" />
-              <Text style={[styles.infoValue, { color: '#3B82F6' }]}>
+              <Ionicons name="timer-outline" size={18} color={Colors.info} />
+              <Text style={[styles.infoValue, { color: Colors.info }]}>
                 {Math.floor(summary.totalBreakMinutes / 60)}h{' '}
                 {Math.round(summary.totalBreakMinutes % 60)}m
               </Text>
@@ -375,10 +377,14 @@ export default function EmployeeBreaksScreen() {
       {Object.keys(breaksByDate).length > 0 ? (
         Object.keys(breaksByDate)
           .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
-          .map((date) => (
-            <View key={date} style={styles.dateSection}>
+          .map((date, dateIndex) => (
+            <Animated.View
+              key={date}
+              style={styles.dateSection}
+              entering={FadeInDown.delay(100 + dateIndex * 100).springify()}
+            >
               <View style={styles.dateSectionHeader}>
-                <Ionicons name="calendar" size={16} color="#6366F1" />
+                <Ionicons name="calendar" size={16} color={Colors.indigo} />
                 <Text style={styles.dateSectionTitle}>
                   {formatDate(new Date(date))}
                 </Text>
@@ -390,14 +396,14 @@ export default function EmployeeBreaksScreen() {
                 </View>
               </View>
               {breaksByDate[date].map((br) => renderBreakCard(br))}
-            </View>
+            </Animated.View>
           ))
       ) : (
         <View style={styles.emptyState}>
           <MaterialCommunityIcons
             name="coffee-off-outline"
             size={64}
-            color="#CBD5E1"
+            color={Colors.gray300}
           />
           <Text style={styles.emptyTitle}>No breaks this month</Text>
           <Text style={styles.emptySubtitle}>
@@ -413,52 +419,48 @@ export default function EmployeeBreaksScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.backgroundSecondary,
   },
   centerContent: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   header: {
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    paddingTop: 60,
+    backgroundColor: Colors.background,
+    padding: Spacing.xl,
+    paddingTop: Spacing['6xl'],
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: Colors.border,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: Typography.fontSize['2xl'],
     fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 4,
+    color: Colors.text,
+    marginBottom: Spacing.xs,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#64748B',
+    marginTop: Spacing.md,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
   },
   dateNavigation: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 16,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.lg,
+    marginHorizontal: Spacing.xl,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.lg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    borderColor: Colors.border,
+    ...Shadows.xs,
   },
   navButton: {
     padding: 8,
@@ -471,49 +473,45 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   dateText: {
-    fontSize: 16,
+    fontSize: Typography.fontSize.base,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.text,
   },
   summarySection: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    paddingHorizontal: Spacing.xl,
+    marginBottom: Spacing.lg,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 12,
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.md,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    borderColor: Colors.border,
+    ...Shadows.xs,
   },
   infoItem: {
     flex: 1,
     alignItems: 'center',
-    gap: 6,
+    gap: Spacing.xs,
   },
   infoValue: {
-    fontSize: 20,
+    fontSize: Typography.fontSize.xl,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.text,
   },
   infoLabel: {
-    fontSize: 11,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '600',
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   infoDivider: {
     width: 1,
     height: 40,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: Colors.border,
   },
   scrollView: {
     flex: 1,
@@ -522,69 +520,65 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   dateSection: {
-    marginBottom: 24,
-    paddingHorizontal: 16,
+    marginBottom: Spacing['2xl'],
+    paddingHorizontal: Spacing.xl,
   },
   dateSectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   dateSectionTitle: {
-    fontSize: 16,
+    fontSize: Typography.fontSize.base,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.text,
     flex: 1,
   },
   dateCountBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: '#EEF2FF',
-    borderRadius: 12,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    backgroundColor: Colors.primaryLight,
+    borderRadius: BorderRadius.lg,
   },
   dateCountText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#6366F1',
+    color: Colors.primary,
   },
   breakCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    marginBottom: Spacing.md,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderColor: Colors.border,
+    ...Shadows.xs,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: Spacing.md,
   },
   timeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: Spacing.sm,
     flex: 1,
   },
   timeText: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '700',
-    color: '#0F172A',
+    color: Colors.text,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm + 2,
   },
   statusText: {
     fontSize: 11,
@@ -594,92 +588,92 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 10,
+    marginBottom: Spacing.md,
   },
   durationText: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '600',
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   reasonSection: {
-    marginTop: 8,
-    padding: 10,
-    backgroundColor: '#FEF3C7',
-    borderRadius: 8,
+    marginTop: Spacing.sm,
+    padding: Spacing.md,
+    backgroundColor: StatusColors.pending.background,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: StatusColors.pending.border,
   },
   reasonLabel: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#78350F',
+    color: StatusColors.pending.text,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 4,
+    marginBottom: Spacing.xs,
   },
   reasonText: {
-    fontSize: 12,
-    color: '#78350F',
+    fontSize: Typography.fontSize.xs,
+    color: StatusColors.pending.text,
     lineHeight: 16,
   },
   notesSection: {
-    marginTop: 8,
-    padding: 10,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
+    marginTop: Spacing.sm,
+    padding: Spacing.md,
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
   },
   notesLabel: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#64748B',
+    color: Colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 4,
+    marginBottom: Spacing.xs,
   },
   notesText: {
-    fontSize: 12,
-    color: '#475569',
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textSecondary,
     lineHeight: 16,
   },
   rejectedSection: {
-    marginTop: 8,
-    padding: 10,
-    backgroundColor: '#FEF2F2',
-    borderRadius: 8,
+    marginTop: Spacing.sm,
+    padding: Spacing.md,
+    backgroundColor: StatusColors.rejected.background,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: StatusColors.rejected.border,
   },
   rejectedLabel: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#991B1B',
+    color: StatusColors.rejected.text,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 4,
+    marginBottom: Spacing.xs,
   },
   rejectedText: {
-    fontSize: 12,
-    color: '#991B1B',
+    fontSize: Typography.fontSize.xs,
+    color: StatusColors.rejected.text,
     lineHeight: 16,
   },
   emptyState: {
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 64,
-    paddingHorizontal: 16,
+    paddingVertical: Spacing['3xl'] * 2,
+    paddingHorizontal: Spacing.lg,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: Typography.fontSize.lg,
     fontWeight: '700',
-    color: '#0F172A',
-    marginTop: 16,
+    color: Colors.text,
+    marginTop: Spacing.lg,
   },
   emptySubtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    marginTop: 8,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
+    marginTop: Spacing.sm,
     textAlign: 'center',
   },
   modalOverlay: {
@@ -689,61 +683,57 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   monthPickerModal: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
     width: '85%',
     maxWidth: 400,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    ...Shadows.lg,
   },
   monthPickerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
-    paddingBottom: 16,
+    marginBottom: Spacing.xl,
+    paddingBottom: Spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: Colors.border,
   },
   monthPickerYear: {
-    fontSize: 20,
+    fontSize: Typography.fontSize.xl,
     fontWeight: '800',
-    color: '#0F172A',
+    color: Colors.text,
   },
   yearButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.backgroundSecondary,
   },
   monthsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: Spacing.md,
   },
   monthButton: {
     width: '30%',
     aspectRatio: 2,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 10,
-    backgroundColor: '#F8FAFC',
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.backgroundSecondary,
     borderWidth: 2,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
   },
   monthButtonActive: {
-    backgroundColor: '#6366F1',
-    borderColor: '#6366F1',
+    backgroundColor: Colors.indigo,
+    borderColor: Colors.indigo,
   },
   monthButtonText: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '700',
-    color: '#64748B',
+    color: Colors.textSecondary,
   },
   monthButtonTextActive: {
-    color: '#FFFFFF',
+    color: Colors.textInverse,
   },
 });

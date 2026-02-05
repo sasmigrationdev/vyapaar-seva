@@ -15,10 +15,11 @@ import { router } from "expo-router";
 import { Text } from "@/components/ui/Text";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useResetPassword } from "@/hooks/mutations/useAuthMutations";
-import { Colors, BorderRadius, Shadows } from "@/constants/theme";
+import { Colors, BorderRadius, Shadows, Gradients } from "@/constants/theme";
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
+  const [emailFocused, setEmailFocused] = useState(false);
   const { success, error } = useAlert();
 
   const resetPasswordMutation = useResetPassword({
@@ -49,7 +50,7 @@ export default function ForgotPasswordScreen() {
 
       {/* Gradient Header */}
       <LinearGradient
-        colors={["#E67300", "#FF9933", "#FFB366"]}
+        colors={Gradients.saffronHero}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.headerGradient}
@@ -90,11 +91,11 @@ export default function ForgotPasswordScreen() {
           </Text>
 
           <View style={styles.form}>
-            <View style={styles.inputContainer}>
+            <View style={[styles.inputContainer, emailFocused && styles.inputContainerFocused]}>
               <MaterialCommunityIcons
                 name="email-outline"
                 size={20}
-                color={Colors.primary}
+                color={emailFocused ? Colors.primary : Colors.gray400}
                 style={styles.inputIcon}
               />
               <TextInput
@@ -106,6 +107,8 @@ export default function ForgotPasswordScreen() {
                 autoCapitalize="none"
                 keyboardType="email-address"
                 editable={!resetPasswordMutation.isPending}
+                onFocus={() => setEmailFocused(true)}
+                onBlur={() => setEmailFocused(false)}
               />
             </View>
 
@@ -173,7 +176,7 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: Colors.textInverse,
     textShadowColor: "rgba(0, 0, 0, 0.2)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
@@ -184,7 +187,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: Colors.background,
     borderRadius: BorderRadius["2xl"],
     padding: 24,
     ...Shadows.lg,
@@ -220,6 +223,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.gray50,
     paddingHorizontal: 16,
   },
+  inputContainerFocused: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.background,
+  },
   inputIcon: {
     marginRight: 12,
   },
@@ -244,7 +251,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    color: "#FFFFFF",
+    color: Colors.textInverse,
     fontSize: 16,
     fontWeight: "700",
   },

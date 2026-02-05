@@ -53,6 +53,22 @@ export const Colors = {
   infoLight: "#60A5FA",
   infoDark: "#2563EB",
 
+  // Cyan - For breaks/secondary accents
+  cyan: "#0891B2",
+  cyanLight: "#CFFAFE",
+
+  // Purple - For overtime/premium features
+  purple: "#8B5CF6",
+  purpleLight: "#FAF5FF",
+
+  // Indigo - For search/discovery
+  indigo: "#6366F1",
+  indigoLight: "#EEF2FF",
+
+  // Pink - For leave/vacation features
+  pink: "#EC4899",
+  pinkLight: "#FCE7F3",
+
   // Neutral/Gray
   gray50: "#F9FAFB",
   gray100: "#F3F4F6",
@@ -249,6 +265,7 @@ export const Spacing = {
 // Border Radius
 export const BorderRadius = {
   none: 0,
+  xs: 6,
   sm: 4,
   md: 8,
   lg: 12,
@@ -369,6 +386,24 @@ export const StatusColors = {
     border: "#FECACA",
     text: "#991B1B",
     icon: Colors.error, // #EF4444
+  },
+  overtime: {
+    background: Colors.purpleLight, // #FAF5FF
+    border: "#E9D5FF",
+    text: "#6B21A8",
+    icon: Colors.purple, // #8B5CF6
+  },
+  info: {
+    background: "#DBEAFE",
+    border: "#93C5FD",
+    text: "#1E40AF",
+    icon: Colors.info, // #3B82F6
+  },
+  break: {
+    background: Colors.cyanLight, // #CFFAFE
+    border: "#A5F3FC",
+    text: "#0E7490",
+    icon: Colors.cyan, // #0891B2
   },
 };
 
@@ -531,4 +566,14 @@ export const AnimationPresets = {
 
   // Fade timing
   fadeDuration: 200,
+
+  // Haptic feedback enabled
+  hapticEnabled: true,
+};
+
+// Press Opacity constants for consistent interaction feedback
+export const PressOpacity = {
+  primary: 0.8, // Primary actions (buttons)
+  secondary: 0.7, // Cards/list items
+  subtle: 0.6, // Icon buttons
 };

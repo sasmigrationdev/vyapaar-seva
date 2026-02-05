@@ -532,4 +532,75 @@ export const attendanceQueries = {
     if (error && error.code !== 'PGRST116') throw error;
     return data?.date || null;
   },
+
+  /**
+   * Get weekly attendance trend for HR dashboard (last 7 days)
+   * Returns daily check-in counts for the organization
+   */
+  getWeeklyAttendanceTrend: async (organizationId: string): Promise<{
+    date: string;
+    dayLabel: string;
+    count: number;
+  }[]> => {
+    const today = new Date();
+    const result: { date: string; dayLabel: string; count: number }[] = [];
+
+    // Get the last 7 days
+    const dates: string[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      dates.push(date.toISOString().split('T')[0]);
+    }
+
+    // Get all currently employed employees for this organization
+    const { data: employmentData, error: employmentError } = await supabase
+      .from('employer_employee_history')
+      .select('employee_id')
+      .eq('organization_id', organizationId)
+      .is('left_at', null);
+
+    if (employmentError) throw employmentError;
+    const employeeIds = (employmentData || []).map(e => e.employee_id);
+
+    if (employeeIds.length === 0) {
+      // Return empty data for all days
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      return dates.map(date => ({
+        date,
+        dayLabel: dayNames[new Date(date).getDay()],
+        count: 0,
+      }));
+    }
+
+    // Get attendance records for the date range
+    const { data: attendanceData, error: attendanceError } = await supabase
+      .from('attendance_records')
+      .select('date, user_id')
+      .in('user_id', employeeIds)
+      .gte('date', dates[0])
+      .lte('date', dates[dates.length - 1])
+      .not('check_in_time', 'is', null);
+
+    if (attendanceError) throw attendanceError;
+
+    // Count attendance per day
+    const countByDate: Record<string, number> = {};
+    (attendanceData || []).forEach(record => {
+      countByDate[record.date] = (countByDate[record.date] || 0) + 1;
+    });
+
+    // Build result with day labels
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    for (const date of dates) {
+      const dayIndex = new Date(date).getDay();
+      result.push({
+        date,
+        dayLabel: dayNames[dayIndex],
+        count: countByDate[date] || 0,
+      });
+    }
+
+    return result;
+  },
 };

@@ -32,9 +32,9 @@ export default function AttendanceStatsCards({
         <View style={styles.divider} />
 
         <View style={styles.statItem}>
-          <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+          <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
           <View style={styles.statContent}>
-            <Text style={[styles.statValue, { color: '#10B981' }]}>{isLoading ? '—' : presentCount}</Text>
+            <Text style={[styles.statValue, { color: Colors.success }]}>{isLoading ? '—' : presentCount}</Text>
             <Text style={styles.statLabel}>Present</Text>
           </View>
         </View>
@@ -42,9 +42,9 @@ export default function AttendanceStatsCards({
         <View style={styles.divider} />
 
         <View style={styles.statItem}>
-          <Ionicons name="close-circle" size={16} color="#EF4444" />
+          <Ionicons name="close-circle" size={16} color={Colors.error} />
           <View style={styles.statContent}>
-            <Text style={[styles.statValue, { color: '#EF4444' }]}>{isLoading ? '—' : absentCount}</Text>
+            <Text style={[styles.statValue, { color: Colors.error }]}>{isLoading ? '—' : absentCount}</Text>
             <Text style={styles.statLabel}>Absent</Text>
           </View>
         </View>
@@ -52,9 +52,9 @@ export default function AttendanceStatsCards({
         <View style={styles.divider} />
 
         <View style={styles.statItem}>
-          <Ionicons name="time" size={16} color="#F59E0B" />
+          <Ionicons name="time" size={16} color={Colors.warning} />
           <View style={styles.statContent}>
-            <Text style={[styles.statValue, { color: '#F59E0B' }]}>
+            <Text style={[styles.statValue, { color: Colors.warning }]}>
               {isLoading ? '—' : `${averageHours.toFixed(1)}h`}
             </Text>
             <Text style={styles.statLabel}>Avg</Text>
@@ -68,8 +68,8 @@ export default function AttendanceStatsCards({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: Colors.backgroundSecondary,
-    paddingHorizontal: 20,
-    paddingVertical: Spacing['lg'],
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing['sm'],
+    gap: Spacing.sm,
     minWidth: 0,
     overflow: 'hidden',
   },

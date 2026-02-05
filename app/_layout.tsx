@@ -49,6 +49,8 @@ function RootLayoutNavWithAuth() {
   const segments = useSegments();
   const router = useRouter();
 
+  console.log('[RootLayoutNavWithAuth] Auth state - loading:', loading, 'session:', !!session, 'user:', !!user, 'needsRoleSelection:', needsRoleSelection, 'role:', user?.role, 'segments:', segments);
+
   // Initialize push notifications after auth is loaded
   const { expoPushToken, error: pushError } = usePushNotifications();
 
@@ -146,6 +148,8 @@ const styles = StyleSheet.create({
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
+  console.log('[RootLayout] Rendering...');
+
   // Load Funnel Sans fonts
   const [fontsLoaded, fontError] = useFonts({
     FunnelSans_400Regular,
@@ -155,15 +159,20 @@ export default function RootLayout() {
     FunnelSans_800ExtraBold,
   });
 
+  console.log('[RootLayout] Fonts loaded:', fontsLoaded, 'Font error:', fontError);
+
   useEffect(() => {
+    console.log('[RootLayout] useEffect - fontsLoaded:', fontsLoaded, 'fontError:', fontError);
     if (fontsLoaded || fontError) {
       // Hide the splash screen after the fonts have loaded (or an error was returned)
+      console.log('[RootLayout] Hiding splash screen...');
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
 
   // Return loading screen while fonts are loading
   if (!fontsLoaded && !fontError) {
+    console.log('[RootLayout] Waiting for fonts, returning null');
     return null;
   }
 

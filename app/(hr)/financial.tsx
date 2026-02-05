@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, RefreshControl } from 'react-native';
+import { useState, useMemo } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, RefreshControl, TextInput } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useAlert } from '@/hooks/useAlert';
 import { Text } from '@/components/ui/Text';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
@@ -13,13 +14,15 @@ import EditTransactionModal from '@/components/financial/EditTransactionModal';
 import TransactionDetailModal from '@/components/financial/TransactionDetailModal';
 import VoiceRecordingModal from '@/components/financial/VoiceRecordingModal';
 import VoiceConfirmationModal from '@/components/financial/VoiceConfirmationModal';
-import VoiceCaptureButton from '@/components/financial/VoiceCaptureButton';
+import CashbookActionBar from '@/components/financial/CashbookActionBar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '@/constants/theme';
+import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useVoiceTransactionExtraction } from '@/hooks/voice/useVoiceTransactionExtraction';
 import { ExtractedTransactionData } from '@/constants/VoiceConfig';
 import { formatForTransactionForm } from '@/hooks/voice/useVoiceTransactionExtraction';
 import { FinancialTransaction } from '@/lib/types/financial.types';
+
+type TransactionFilter = 'all' | 'income' | 'expense';
 
 export default function FinancialScreen() {
   const { user, loading: isLoadingAuth } = useAuth();
@@ -50,6 +53,10 @@ export default function FinancialScreen() {
   const [selectedDate, setSelectedDate] = useState(now);
   const currentMonth = selectedDate.getMonth();
   const currentYear = selectedDate.getFullYear();
+
+  // Filter and search state
+  const [transactionFilter, setTransactionFilter] = useState<TransactionFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const { data: balance, isLoading: loadingBalance } = useCurrentBalance(
     user?.organization_id || '',
@@ -218,6 +225,56 @@ export default function FinancialScreen() {
 
   const isLoadingData = loadingBalance || loadingSummary || loadingTransactions;
 
+  // Filter and search transactions
+  const filteredTransactions = useMemo(() => {
+    if (!recentTransactions) return [];
+
+    let filtered = [...recentTransactions];
+
+    // Apply type filter
+    if (transactionFilter !== 'all') {
+      filtered = filtered.filter((t) => t.type === transactionFilter);
+    }
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (t) =>
+          t.description?.toLowerCase().includes(query) ||
+          t.category?.name?.toLowerCase().includes(query) ||
+          t.notes?.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [recentTransactions, transactionFilter, searchQuery]);
+
+  // Calculate category with most transactions
+  const mostActiveCategory = useMemo(() => {
+    if (!recentTransactions || recentTransactions.length === 0) return null;
+
+    const categoryCount: Record<string, { name: string; count: number }> = {};
+    recentTransactions.forEach((t) => {
+      if (t.category?.name) {
+        if (!categoryCount[t.category.name]) {
+          categoryCount[t.category.name] = { name: t.category.name, count: 0 };
+        }
+        categoryCount[t.category.name].count++;
+      }
+    });
+
+    const sorted = Object.values(categoryCount).sort((a, b) => b.count - a.count);
+    return sorted[0] || null;
+  }, [recentTransactions]);
+
+  // Calculate average transaction amount
+  const avgTransactionAmount = useMemo(() => {
+    if (!recentTransactions || recentTransactions.length === 0) return 0;
+    const total = recentTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+    return Math.round(total / recentTransactions.length);
+  }, [recentTransactions]);
+
   // Show loading state while auth is initializing
   if (isLoadingAuth) {
     return (
@@ -238,11 +295,11 @@ export default function FinancialScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.backgroundSecondary} />
-      
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={{ paddingBottom: 200 }}
+        contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 160 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -253,155 +310,271 @@ export default function FinancialScreen() {
           />
         }
       >
-        {/* Header */}
-        <View style={[styles.header, { paddingTop: insets.top }]}>
-          <View style={styles.headerTop}>
+        {/* Header Section */}
+        <Animated.View entering={FadeInDown.delay(50).springify()} style={styles.headerSection}>
+          {/* Header Row with Title and Settings */}
+          <View style={styles.headerRow}>
             <Text style={styles.headerTitle}>Cash Book</Text>
             <TouchableOpacity
               style={styles.settingsButton}
               onPress={() => router.push('/(hr)/categories')}
+              activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="cog" size={20} color={Colors.primary} />
+              <MaterialCommunityIcons name="cog-outline" size={20} color={Colors.primary} />
             </TouchableOpacity>
           </View>
 
-          {/* Month Selector */}
-          <View style={styles.monthSelector}>
+          {/* Month Navigation Row */}
+          <View style={styles.monthRow}>
             <TouchableOpacity
               onPress={previousMonth}
-              style={styles.monthButton}
+              style={styles.navButton}
               activeOpacity={0.7}
             >
-              <Ionicons name="chevron-back" size={20} color={Colors.primary} />
+              <Ionicons name="chevron-back" size={18} color={Colors.primary} />
             </TouchableOpacity>
 
-            <View style={styles.monthTextContainer}>
-              <MaterialCommunityIcons
-                name="calendar-month"
-                size={18}
-                color={Colors.primary}
-              />
-              <Text style={styles.monthText}>
-                {selectedDate.toLocaleDateString('en-US', {
-                  month: 'long',
-                  year: 'numeric',
-                })}
-              </Text>
+            <View style={styles.monthContainer}>
+              {isCurrentMonth ? (
+                <View style={styles.thisMonthBadge}>
+                  <Text style={styles.thisMonthText}>This Month</Text>
+                </View>
+              ) : (
+                <View style={styles.monthTextRow}>
+                  <Text style={styles.monthMainText}>
+                    {selectedDate.toLocaleDateString('en-US', {
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.jumpCurrentButton}
+                    onPress={() => setSelectedDate(new Date())}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.jumpCurrentText}>Current</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
             <TouchableOpacity
               onPress={nextMonth}
-              style={[styles.monthButton, isCurrentMonth && styles.monthButtonDisabled]}
+              style={[styles.navButton, isCurrentMonth && styles.navButtonDisabled]}
               disabled={isCurrentMonth}
               activeOpacity={0.7}
             >
               <Ionicons
                 name="chevron-forward"
-                size={20}
+                size={18}
                 color={isCurrentMonth ? Colors.gray300 : Colors.primary}
               />
             </TouchableOpacity>
           </View>
-        </View>
+        </Animated.View>
 
-        {/* Balance & Summary Section */}
-        <View style={styles.summaryContainer}>
-          {/* Current Balance */}
+        {/* Balance Card */}
+        <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.balanceSection}>
           <View style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>Current Balance</Text>
             {loadingBalance ? (
-              <ActivityIndicator size="small" color={Colors.primary} />
+              <ActivityIndicator size="small" color={Colors.textInverse} />
             ) : (
               <Text style={[styles.balanceAmount, balance && balance < 0 && styles.negativeBalance]}>
                 ₹{balance?.toLocaleString('en-IN') || '0'}
               </Text>
             )}
           </View>
+        </Animated.View>
 
-          {/* Monthly Stats */}
-          {isLoadingData ? (
-            <View style={styles.loadingState}>
-              <ActivityIndicator size="small" color={Colors.primary} />
+        {/* Tappable Stats Grid - Acts as Filter */}
+        <Animated.View entering={FadeInDown.delay(150).springify()} style={styles.statsSection}>
+          <View style={styles.statsGrid}>
+            {/* All Transactions */}
+            <TouchableOpacity
+              style={[
+                styles.primaryStatCard,
+                transactionFilter === 'all' && styles.statCardSelected,
+              ]}
+              onPress={() => setTransactionFilter('all')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.primaryStatValue}>
+                {isLoadingData ? '—' : (recentTransactions?.length || 0)}
+              </Text>
+              <Text style={styles.primaryStatLabel}>All</Text>
+            </TouchableOpacity>
+
+            {/* Income */}
+            <TouchableOpacity
+              style={[
+                styles.statCard,
+                transactionFilter === 'income' && styles.statCardSelectedGreen,
+                (summary?.totalIncome || 0) > 0 && transactionFilter !== 'income' && styles.statCardHighlight,
+              ]}
+              onPress={() => setTransactionFilter('income')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.statCardContent}>
+                <View style={[styles.statIcon, transactionFilter === 'income' ? { backgroundColor: 'rgba(255,255,255,0.2)' } : { backgroundColor: Colors.success + '15' }]}>
+                  <Ionicons name="arrow-down" size={14} color={transactionFilter === 'income' ? Colors.textInverse : Colors.success} />
+                </View>
+                <View style={styles.statTextContent}>
+                  <Text style={[styles.statLabel, transactionFilter === 'income' && styles.statLabelSelected]}>Income</Text>
+                  <Text style={[styles.statValue, transactionFilter === 'income' && styles.statValueSelected]} numberOfLines={1}>
+                    ₹{summary?.totalIncome?.toLocaleString('en-IN') || '0'}
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            {/* Expense */}
+            <TouchableOpacity
+              style={[
+                styles.statCard,
+                transactionFilter === 'expense' && styles.statCardSelectedRed,
+                (summary?.totalExpense || 0) > 0 && transactionFilter !== 'expense' && styles.statCardAlertBg,
+              ]}
+              onPress={() => setTransactionFilter('expense')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.statCardContent}>
+                <View style={[styles.statIcon, transactionFilter === 'expense' ? { backgroundColor: 'rgba(255,255,255,0.2)' } : { backgroundColor: Colors.error + '15' }]}>
+                  <Ionicons name="arrow-up" size={14} color={transactionFilter === 'expense' ? Colors.textInverse : Colors.error} />
+                </View>
+                <View style={styles.statTextContent}>
+                  <Text style={[styles.statLabel, transactionFilter === 'expense' && styles.statLabelSelected]}>Expense</Text>
+                  <Text style={[styles.statValue, transactionFilter === 'expense' && styles.statValueSelected]} numberOfLines={1}>
+                    ₹{summary?.totalExpense?.toLocaleString('en-IN') || '0'}
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Secondary Info Row */}
+          <View style={styles.infoRow}>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Net Flow</Text>
+              <Text style={[styles.infoValue, (summary?.balance || 0) < 0 && { color: Colors.error }]}>
+                {isLoadingData ? '—' : `₹${summary?.balance?.toLocaleString('en-IN') || '0'}`}
+              </Text>
             </View>
-          ) : summary ? (
-            <View style={styles.statsGrid}>
-              <View style={styles.statCard}>
-                <View style={[styles.statIcon, { backgroundColor: Colors.success + '20' }]}>
-                  <Ionicons name="arrow-down" size={16} color={Colors.success} />
-                </View>
-                <Text style={styles.statLabel}>Income</Text>
-                <Text style={styles.statValue} numberOfLines={1}>₹{summary.totalIncome?.toLocaleString('en-IN') || '0'}</Text>
-              </View>
 
-              <View style={styles.statCard}>
-                <View style={[styles.statIcon, { backgroundColor: Colors.error + '20' }]}>
-                  <Ionicons name="arrow-up" size={16} color={Colors.error} />
+            {avgTransactionAmount > 0 && (
+              <>
+                <View style={styles.infoDivider} />
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Avg Txn</Text>
+                  <Text style={styles.infoValue}>
+                    ₹{avgTransactionAmount.toLocaleString('en-IN')}
+                  </Text>
                 </View>
-                <Text style={styles.statLabel}>Expense</Text>
-                <Text style={styles.statValue} numberOfLines={1}>₹{summary.totalExpense?.toLocaleString('en-IN') || '0'}</Text>
-              </View>
+              </>
+            )}
 
-              <View style={styles.statCard}>
-                <View style={[styles.statIcon, { backgroundColor: Colors.primary + '20' }]}>
-                  <MaterialCommunityIcons name="cash-multiple" size={16} color={Colors.primary} />
+            {mostActiveCategory && (
+              <>
+                <View style={styles.infoDivider} />
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Top Category</Text>
+                  <Text style={[styles.infoValue, { color: Colors.primary }]} numberOfLines={1}>
+                    {mostActiveCategory.name}
+                  </Text>
                 </View>
-                <Text style={styles.statLabel}>Net Flow</Text>
-                <Text style={[styles.statValue, (summary.balance || 0) < 0 && styles.negativeText]} numberOfLines={1}>
-                  ₹{summary.balance?.toLocaleString('en-IN') || '0'}
-                </Text>
-              </View>
-            </View>
-          ) : null}
-        </View>
+              </>
+            )}
+          </View>
+        </Animated.View>
+
+        {/* Search Bar */}
+        <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.searchContainer}>
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={16} color={Colors.textTertiary} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search transactions..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholderTextColor={Colors.textTertiary}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchQuery('')}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close-circle" size={16} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+          {/* Active filter indicator */}
+          {transactionFilter !== 'all' && (
+            <TouchableOpacity
+              style={styles.activeFilterBadge}
+              onPress={() => setTransactionFilter('all')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.activeFilterText}>
+                {transactionFilter === 'income' ? 'Income' : 'Expense'}
+              </Text>
+              <Ionicons name="close" size={14} color={Colors.primary} />
+            </TouchableOpacity>
+          )}
+        </Animated.View>
 
         {/* Transactions Section */}
-        <View style={styles.section}>
+        <Animated.View entering={FadeInDown.delay(250).springify()} style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Transactions</Text>
-            <Text style={styles.sectionCount}>
-              {recentTransactions?.length || 0}
-            </Text>
+            <View style={styles.sectionCountBadge}>
+              <Text style={styles.sectionCount}>
+                {filteredTransactions.length}
+              </Text>
+            </View>
           </View>
 
           {loadingTransactions ? (
             <View style={styles.loadingCard}>
               <ActivityIndicator size="large" color={Colors.primary} />
             </View>
-          ) : recentTransactions && recentTransactions.length > 0 ? (
+          ) : filteredTransactions.length > 0 ? (
             <View style={styles.transactionsList}>
-              {recentTransactions.map((transaction) => (
-                <TransactionCard
+              {filteredTransactions.map((transaction, index) => (
+                <Animated.View
                   key={transaction.id}
-                  transaction={transaction}
-                  onPress={() => handleTransactionPress(transaction)}
-                />
+                  entering={FadeInDown.delay(300 + index * 30).springify()}
+                >
+                  <TransactionCard
+                    transaction={transaction}
+                    onPress={() => handleTransactionPress(transaction)}
+                  />
+                </Animated.View>
               ))}
             </View>
           ) : (
             <View style={styles.emptyState}>
               <MaterialCommunityIcons name="receipt-text-outline" size={48} color={Colors.gray300} />
-              <Text style={styles.emptyText}>No transactions</Text>
-              <Text style={styles.emptySubtext}>Add your first transaction to get started</Text>
+              <Text style={styles.emptyText}>
+                {searchQuery || transactionFilter !== 'all'
+                  ? 'No matching transactions'
+                  : 'No transactions'}
+              </Text>
+              <Text style={styles.emptySubtext}>
+                {searchQuery || transactionFilter !== 'all'
+                  ? 'Try adjusting your filters'
+                  : 'Add your first transaction to get started'}
+              </Text>
             </View>
           )}
-        </View>
+        </Animated.View>
       </ScrollView>
 
-      {/* Floating Add Button */}
-      <TouchableOpacity
-        style={[styles.fab, { bottom: 60 + (insets.bottom > 0 ? insets.bottom : 0) + Spacing['lg'] }]}
-        onPress={() => setShowAddModal(true)}
-        activeOpacity={0.8}
-      >
-        <MaterialCommunityIcons name="plus" size={28} color={Colors.textInverse} />
-      </TouchableOpacity>
-
-      {/* Voice Input FAB */}
-      <VoiceCaptureButton
-        variant="fab"
-        onPress={() => setShowVoiceRecording(true)}
-        isLoading={voiceState.isLoading}
-        style={[styles.voiceFab, { bottom: 60 + (insets.bottom > 0 ? insets.bottom : 0) + Spacing['lg'] + 70 }]}
+      {/* Floating Action Bar */}
+      <CashbookActionBar
+        onAddTransaction={() => setShowAddModal(true)}
+        onVoiceInput={() => setShowVoiceRecording(true)}
+        onOpenCategories={() => router.push('/(hr)/categories')}
+        isVoiceLoading={voiceState.isLoading}
       />
 
       {/* Add Transaction Modal */}
@@ -490,131 +663,277 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  header: {
-    backgroundColor: Colors.backgroundSecondary,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+  // Header Section
+  headerSection: {
+    backgroundColor: Colors.background,
+    paddingTop: Spacing.xs,
+    paddingBottom: Spacing.sm,
   },
-  headerTop: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
   },
   headerTitle: {
-    fontSize: Typography.fontSize.xl2,
+    fontSize: Typography.fontSize['2xl'],
     fontWeight: Typography.fontWeight.bold,
     color: Colors.text,
-    flex: 1,
   },
   settingsButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.primaryLight + '20',
+    backgroundColor: Colors.primary + '12',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  monthSelector: {
+  // Month Navigation
+  monthRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.lg,
   },
-  monthButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.primaryLight + '20',
+  navButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.primary + '12',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  monthButtonDisabled: {
+  navButtonDisabled: {
     backgroundColor: Colors.gray100,
-    opacity: 0.5,
+    opacity: 0.4,
   },
-  monthTextContainer: {
+  monthContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  thisMonthBadge: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+  },
+  thisMonthText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.textInverse,
+  },
+  monthTextRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    flex: 1,
-    justifyContent: 'center',
   },
-  monthText: {
-    fontSize: Typography.fontSize.md,
-    fontWeight: Typography.fontWeight.semibold,
+  monthMainText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.text,
   },
-  summaryContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: Spacing.xl,
-    gap: Spacing.lg,
+  jumpCurrentButton: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primary + '15',
+  },
+  jumpCurrentText: {
+    fontSize: 11,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.primary,
+  },
+  // Balance Section
+  balanceSection: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.xs,
   },
   balanceCard: {
     backgroundColor: Colors.primary,
     borderRadius: BorderRadius.xl,
-    padding: Spacing.xl,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.xs,
   },
   balanceLabel: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.medium,
     color: Colors.textInverse,
     opacity: 0.9,
   },
   balanceAmount: {
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: Typography.fontWeight.bold,
     color: Colors.textInverse,
   },
   negativeBalance: {
-    color: Colors.error,
+    color: '#FEE2E2',
   },
-  loadingState: {
-    padding: Spacing.xl,
-    alignItems: 'center',
+  // Stats Section
+  statsSection: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    gap: Spacing.sm,
   },
   statsGrid: {
     flexDirection: 'row',
-    gap: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  primaryStatCard: {
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    alignItems: 'center',
+    minWidth: 64,
+  },
+  primaryStatValue: {
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.textInverse,
+  },
+  primaryStatLabel: {
+    fontSize: 10,
+    fontWeight: Typography.fontWeight.medium,
+    color: Colors.textInverse,
+    opacity: 0.9,
+    marginTop: 2,
   },
   statCard: {
     flex: 1,
-    backgroundColor: Colors.gray50,
+    backgroundColor: Colors.backgroundSecondary,
     borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    gap: Spacing.xs,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: 'hidden',
-    minWidth: 0,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+  },
+  statCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   statIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  statTextContent: {
+    flex: 1,
+    minWidth: 0,
+  },
   statLabel: {
-    fontSize: Typography.fontSize.xs,
+    fontSize: 10,
     fontWeight: Typography.fontWeight.medium,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xs,
+    color: Colors.textTertiary,
+  },
+  statLabelSelected: {
+    color: Colors.textInverse,
+    opacity: 0.9,
   },
   statValue: {
-    fontSize: Typography.fontSize.md,
+    fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.bold,
     color: Colors.text,
   },
-  negativeText: {
-    color: Colors.error,
+  statValueSelected: {
+    color: Colors.textInverse,
   },
+  statCardHighlight: {
+    backgroundColor: Colors.success + '10',
+  },
+  statCardAlertBg: {
+    backgroundColor: Colors.error + '10',
+  },
+  statCardSelected: {
+    borderWidth: 2,
+    borderColor: Colors.primaryDark,
+  },
+  statCardSelectedGreen: {
+    backgroundColor: Colors.success,
+  },
+  statCardSelectedRed: {
+    backgroundColor: Colors.error,
+  },
+  // Info Row
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+  },
+  infoItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.xs,
+  },
+  infoLabel: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textSecondary,
+  },
+  infoValue: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.text,
+  },
+  infoDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: Colors.border,
+  },
+  // Search
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    gap: Spacing.sm,
+  },
+  searchBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.md,
+    gap: Spacing.sm,
+    height: 36,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.text,
+    height: 36,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+  },
+  activeFilterBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Colors.primary + '15',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+  },
+  activeFilterText: {
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.primary,
+  },
+  // Transactions Section
   section: {
-    paddingHorizontal: 20,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
     paddingBottom: Spacing.xl,
   },
   sectionHeader: {
@@ -628,14 +947,16 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.bold,
     color: Colors.text,
   },
-  sectionCount: {
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.textSecondary,
+  sectionCountBadge: {
     backgroundColor: Colors.gray100,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.full,
+  },
+  sectionCount: {
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.textSecondary,
   },
   transactionsList: {
     gap: Spacing.sm,
@@ -644,20 +965,16 @@ const styles = StyleSheet.create({
     padding: Spacing['4xl'],
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.gray50,
+    backgroundColor: Colors.backgroundSecondary,
     borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
   emptyState: {
     padding: Spacing['4xl'],
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.gray50,
+    backgroundColor: Colors.backgroundSecondary,
     borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: Spacing.lg,
+    gap: Spacing.md,
   },
   emptyText: {
     fontSize: Typography.fontSize.lg,
@@ -686,21 +1003,5 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.md,
     color: Colors.error,
     textAlign: 'center',
-  },
-  fab: {
-    position: 'absolute',
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadows.lg,
-    elevation: 8,
-  },
-  voiceFab: {
-    position: 'absolute',
-    right: 24,
   },
 });

@@ -12,7 +12,7 @@ import { formatTime } from '@/lib/utils/date.utils';
 import { formatHours } from '@/lib/utils/attendance.utils';
 import { downloadAttendanceReport } from '@/lib/utils/attendanceSheet.utils';
 import { AttendanceRecord, YearFilter, MonthFilter } from '@/lib/types';
-import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, StatusColors } from '@/constants/theme';
 import AddOvertimeModal from '@/components/attendance/AddOvertimeModal';
 import YearMonthSelector from '@/components/ui/YearMonthSelector';
 import EnhancedAttendanceStats from '@/components/attendance/EnhancedAttendanceStats';
@@ -50,8 +50,8 @@ export default function AttendanceScreen() {
     refetch: refetchSummary
   } = useUserAttendanceSummary(userId, selectedYear, selectedMonth);
 
-  // Calculate date range for overtime requests
-  const dateRange = useMemo(() => {
+  // Calculate date range for overtime requests (also used as filter param)
+  const overtimeFilters = useMemo(() => {
     if (selectedYear === 'all') {
       return { startDate: undefined, endDate: undefined };
     }
@@ -69,10 +69,10 @@ export default function AttendanceScreen() {
   }, [selectedYear, selectedMonth]);
 
   // Fetch overtime requests for the selected period
-  const { data: overtimeRequests, refetch: refetchOvertimeRequests } = useMyOvertimeRequests(userId, {
-    startDate: dateRange.startDate,
-    endDate: dateRange.endDate,
-  });
+  const { data: overtimeRequests, refetch: refetchOvertimeRequests } = useMyOvertimeRequests(
+    userId,
+    overtimeFilters
+  );
 
   // Helper to get overtime request for a specific attendance record
   const getOvertimeRequest = (attendanceRecordId: string) => {
@@ -152,6 +152,9 @@ export default function AttendanceScreen() {
           style={[styles.tableRow, isExpanded && styles.tableRowExpanded]}
           onPress={() => hasExpandableContent && toggleExpand(item.id)}
           activeOpacity={hasExpandableContent ? 0.7 : 1}
+          accessibilityLabel={`${dateStr} ${weekday}, Check in ${item.check_in_time ? formatTime(new Date(item.check_in_time)) : 'not recorded'}, Check out ${item.check_out_time ? formatTime(new Date(item.check_out_time)) : 'not recorded'}${hasExpandableContent ? ', tap to expand details' : ''}`}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: isExpanded }}
         >
           {/* Date */}
           <View style={styles.tableCellDate}>
@@ -196,8 +199,10 @@ export default function AttendanceScreen() {
                   setShowOvertimeModal(true);
                 }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel={`Add overtime for ${dateStr}`}
+                accessibilityRole="button"
               >
-                <Ionicons name="add-circle-outline" size={18} color="#8B5CF6" />
+                <Ionicons name="add-circle-outline" size={18} color={Colors.purple} />
               </TouchableOpacity>
             ) : (
               <Text style={styles.tableCellOTEmpty}>--</Text>
@@ -210,7 +215,7 @@ export default function AttendanceScreen() {
               <Ionicons
                 name={isExpanded ? 'chevron-up' : 'chevron-down'}
                 size={16}
-                color="#94A3B8"
+                color={Colors.gray400}
               />
             </View>
           )}
@@ -223,7 +228,7 @@ export default function AttendanceScreen() {
             {item.notes && (
               <View style={styles.expandedSection}>
                 <View style={styles.expandedSectionHeader}>
-                  <Feather name="file-text" size={14} color="#64748B" />
+                  <Feather name="file-text" size={14} color={Colors.gray500} />
                   <Text style={styles.expandedSectionLabel}>Notes</Text>
                 </View>
                 <Text style={styles.expandedNotesText}>{item.notes}</Text>
@@ -240,7 +245,7 @@ export default function AttendanceScreen() {
                       <Text style={styles.expandedOvertimePendingLabel}>Waiting for Approval</Text>
                     </View>
                     <View style={styles.expandedOvertimeRow}>
-                      <MaterialCommunityIcons name="clock-plus-outline" size={16} color="#F59E0B" />
+                      <MaterialCommunityIcons name="clock-plus-outline" size={16} color={Colors.warning} />
                       <Text style={styles.expandedOvertimePendingHours}>
                         {formatHours(overtimeRequest.requested_hours)} requested
                       </Text>
@@ -256,7 +261,7 @@ export default function AttendanceScreen() {
                 return (
                   <View style={styles.expandedOvertimeRejected}>
                     <View style={styles.expandedOvertimeHeader}>
-                      <Ionicons name="close-circle" size={14} color="#EF4444" />
+                      <Ionicons name="close-circle" size={14} color={Colors.error} />
                       <Text style={styles.expandedOvertimeRejectedLabel}>Request Rejected</Text>
                     </View>
                     <Text style={styles.expandedOvertimeRejectedHours}>
@@ -275,7 +280,7 @@ export default function AttendanceScreen() {
                 return (
                   <View style={styles.expandedOvertimeApproved}>
                     <View style={styles.expandedOvertimeHeader}>
-                      <MaterialCommunityIcons name="clock-plus-outline" size={14} color="#8B5CF6" />
+                      <MaterialCommunityIcons name="clock-plus-outline" size={14} color={Colors.purple} />
                       <Text style={styles.expandedOvertimeApprovedLabel}>Overtime Approved</Text>
                     </View>
                     <Text style={styles.expandedOvertimeApprovedHours}>
@@ -297,7 +302,7 @@ export default function AttendanceScreen() {
                   }}
                   activeOpacity={0.7}
                 >
-                  <MaterialCommunityIcons name="clock-plus-outline" size={16} color="#8B5CF6" />
+                  <MaterialCommunityIcons name="clock-plus-outline" size={16} color={Colors.purple} />
                   <Text style={styles.expandedAddOvertimeText}>Request Overtime</Text>
                 </TouchableOpacity>
               );
@@ -309,21 +314,21 @@ export default function AttendanceScreen() {
   };
 
   const TableHeader = () => (
-    <View style={styles.tableHeader}>
+    <View style={styles.tableHeader} accessibilityRole="header">
       <View style={styles.tableCellDate}>
-        <Text style={styles.tableHeaderText}>Date</Text>
+        <Text style={styles.tableHeaderText} accessibilityLabel="Date">Date</Text>
       </View>
       <View style={styles.tableCellTime}>
-        <Text style={styles.tableHeaderText}>In</Text>
+        <Text style={styles.tableHeaderText} accessibilityLabel="Check-in time">In</Text>
       </View>
       <View style={styles.tableCellTime}>
-        <Text style={styles.tableHeaderText}>Out</Text>
+        <Text style={styles.tableHeaderText} accessibilityLabel="Check-out time">Out</Text>
       </View>
       <View style={styles.tableCellHours}>
-        <Text style={styles.tableHeaderText}>Hours</Text>
+        <Text style={styles.tableHeaderText} accessibilityLabel="Working hours">Hours</Text>
       </View>
       <View style={styles.tableCellOT}>
-        <Text style={styles.tableHeaderText}>OT</Text>
+        <Text style={styles.tableHeaderText} accessibilityLabel="Overtime hours">OT</Text>
       </View>
       <View style={styles.expandIndicator} />
     </View>
@@ -395,12 +400,15 @@ export default function AttendanceScreen() {
               onPress={handleDownloadReport}
               disabled={!records || records.length === 0 || downloading || selectedYear === 'all' || selectedMonth === 'all'}
               activeOpacity={0.7}
+              accessibilityLabel={downloading ? "Downloading report" : "Download PDF attendance report"}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !records || records.length === 0 || downloading || selectedYear === 'all' || selectedMonth === 'all' }}
             >
               {downloading ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator size="small" color={Colors.textInverse} />
               ) : (
                 <>
-                  <Ionicons name="download-outline" size={20} color="#FFFFFF" />
+                  <Ionicons name="download-outline" size={20} color={Colors.textInverse} />
                   <Text style={styles.downloadButtonText}>Download PDF Report</Text>
                 </>
               )}
@@ -428,7 +436,7 @@ export default function AttendanceScreen() {
 
   const ListEmpty = () => (
     <View style={styles.emptyContainer}>
-      <Feather name="calendar" size={64} color="#CBD5E1" />
+      <Feather name="calendar" size={64} color={Colors.gray300} />
       <Text style={styles.emptyText}>No attendance records for this period</Text>
       <Text style={styles.emptySubtext}>Records will appear here once you check in</Text>
     </View>
@@ -446,7 +454,7 @@ export default function AttendanceScreen() {
         <>
           <ListHeader />
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#6366F1" />
+            <ActivityIndicator size="large" color={Colors.indigo} />
           </View>
         </>
       ) : (
@@ -464,8 +472,8 @@ export default function AttendanceScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              colors={['#6366F1']}
-              tintColor="#6366F1"
+              colors={[Colors.indigo]}
+              tintColor={Colors.indigo}
             />
           }
         />
@@ -536,7 +544,7 @@ const styles = StyleSheet.create({
   },
   // Table Styles
   tableContainer: {
-    marginHorizontal: Spacing.lg,
+    marginHorizontal: Spacing.xl,
     marginTop: Spacing.sm,
     backgroundColor: Colors.backgroundSecondary,
     borderTopLeftRadius: BorderRadius.xl,
@@ -549,19 +557,19 @@ const styles = StyleSheet.create({
   tableHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    backgroundColor: Colors.backgroundTertiary,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
   },
   tableHeaderText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#64748B',
+    color: Colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   tableRowWrapper: {
-    marginHorizontal: Spacing.lg,
+    marginHorizontal: Spacing.xl,
     backgroundColor: Colors.backgroundSecondary,
     borderLeftWidth: 1,
     borderRightWidth: 1,
@@ -570,15 +578,15 @@ const styles = StyleSheet.create({
   tableRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
     backgroundColor: Colors.backgroundSecondary,
   },
   tableRowExpanded: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.backgroundSecondary,
   },
   tableRowSeparator: {
-    marginHorizontal: Spacing.lg,
+    marginHorizontal: Spacing.xl,
     height: StyleSheet.hairlineWidth,
     backgroundColor: Colors.border,
   },
@@ -589,11 +597,11 @@ const styles = StyleSheet.create({
   tableCellDateText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#0F172A',
+    color: Colors.text,
   },
   tableCellWeekday: {
     fontSize: 9,
-    color: '#94A3B8',
+    color: Colors.gray400,
     marginTop: 1,
   },
   tableCellTime: {
@@ -603,7 +611,7 @@ const styles = StyleSheet.create({
   tableCellTimeText: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#334155',
+    color: Colors.gray700,
   },
   tableCellHours: {
     flex: 1,
@@ -612,7 +620,7 @@ const styles = StyleSheet.create({
   tableCellHoursText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#6366F1',
+    color: Colors.indigo,
   },
   tableCellOT: {
     width: 40,
@@ -621,24 +629,24 @@ const styles = StyleSheet.create({
   tableCellOTText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#8B5CF6',
+    color: Colors.purple,
   },
   tableCellOTEmpty: {
     fontSize: 10,
-    color: '#CBD5E1',
+    color: Colors.gray300,
   },
   otPendingDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#F59E0B',
+    backgroundColor: Colors.warning,
   },
   expandIndicator: {
     width: 16,
     alignItems: 'center',
   },
   tableFooter: {
-    marginHorizontal: Spacing.lg,
+    marginHorizontal: Spacing.xl,
     height: 12,
     backgroundColor: Colors.backgroundSecondary,
     borderLeftWidth: 1,
@@ -649,58 +657,58 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: BorderRadius.xl,
   },
   expandedContent: {
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-    backgroundColor: '#F8FAFC',
-    gap: 8,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
+    backgroundColor: Colors.backgroundSecondary,
+    gap: Spacing.sm,
   },
   expandedSection: {
-    backgroundColor: '#FFFFFF',
-    padding: 10,
-    borderRadius: 8,
+    backgroundColor: Colors.background,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
   },
   expandedSectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 4,
+    marginBottom: Spacing.xs,
   },
   expandedSectionLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#64748B',
+    color: Colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   expandedNotesText: {
     fontSize: 13,
-    color: '#334155',
+    color: Colors.text,
     lineHeight: 18,
   },
   // Expanded Overtime Styles
   expandedOvertimePending: {
-    backgroundColor: '#FFFBEB',
-    padding: 10,
-    borderRadius: 8,
+    backgroundColor: StatusColors.pending.background,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: StatusColors.pending.border,
   },
   expandedOvertimeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 4,
+    marginBottom: Spacing.xs,
   },
   pulseDotOrange: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#F59E0B',
+    backgroundColor: Colors.warning,
   },
   expandedOvertimePendingLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#92400E',
+    color: StatusColors.pending.text,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -712,61 +720,61 @@ const styles = StyleSheet.create({
   expandedOvertimePendingHours: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#92400E',
+    color: StatusColors.pending.text,
   },
   expandedOvertimeReason: {
     fontSize: 12,
-    color: '#B45309',
+    color: Colors.warningDark,
     marginTop: 4,
   },
   expandedOvertimeRejected: {
-    backgroundColor: '#FEF2F2',
-    padding: 10,
-    borderRadius: 8,
+    backgroundColor: StatusColors.rejected.background,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: StatusColors.rejected.border,
   },
   expandedOvertimeRejectedLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#991B1B',
+    color: StatusColors.rejected.text,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   expandedOvertimeRejectedHours: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#991B1B',
+    color: StatusColors.rejected.text,
   },
   expandedOvertimeRejectedNote: {
     fontSize: 12,
-    color: '#B91C1C',
+    color: Colors.errorDark,
     marginTop: 4,
     fontStyle: 'italic',
   },
   expandedOvertimeApproved: {
-    backgroundColor: '#FAF5FF',
-    padding: 10,
-    borderRadius: 8,
+    backgroundColor: Colors.purpleLight,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: '#E9D5FF',
+    borderColor: StatusColors.overtime.border,
   },
   expandedOvertimeApprovedLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#8B5CF6',
+    color: Colors.purple,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   expandedOvertimeApprovedHours: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#6B21A8',
+    color: StatusColors.overtime.text,
     marginTop: 2,
   },
   expandedOvertimeApprovedReason: {
     fontSize: 12,
-    color: '#7C3AED',
+    color: Colors.purple,
     marginTop: 4,
   },
   expandedAddOvertimeButton: {
@@ -775,15 +783,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 10,
-    backgroundColor: '#FAF5FF',
+    backgroundColor: Colors.purpleLight,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E9D5FF',
+    borderColor: StatusColors.overtime.border,
   },
   expandedAddOvertimeText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#8B5CF6',
+    color: Colors.purple,
   },
   loadingContainer: {
     flex: 1,
@@ -794,18 +802,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 48,
-    gap: 16,
+    padding: Spacing['3xl'] + Spacing.lg,
+    gap: Spacing.lg,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: Typography.fontSize.base,
     fontWeight: '600',
-    color: '#64748B',
+    color: Colors.textSecondary,
     textAlign: 'center',
   },
   emptySubtext: {
-    fontSize: 14,
-    color: '#94A3B8',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textTertiary,
     textAlign: 'center',
   },
   groupedList: {

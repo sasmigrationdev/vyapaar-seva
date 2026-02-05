@@ -20,6 +20,13 @@ import { formatDate, formatTime } from '@/lib/utils/date.utils';
 import { formatHours } from '@/lib/utils/attendance.utils';
 import { useOvertimeRequestByAttendance } from '@/hooks/queries/useOvertimeRequests';
 import { useCreateOvertimeRequest } from '@/hooks/mutations/useOvertimeRequestMutations';
+import {
+  Colors,
+  BorderRadius,
+  Spacing,
+  StatusColors,
+  Typography,
+} from '@/constants/theme';
 
 interface AddOvertimeModalProps {
   visible: boolean;
@@ -38,6 +45,8 @@ export default function AddOvertimeModal({
   const [hoursInput, setHoursInput] = useState('');
   const [minutesInput, setMinutesInput] = useState('');
   const [overtimeReason, setOvertimeReason] = useState('');
+
+  const MAX_REASON_LENGTH = 500;
 
   // Fetch existing overtime request for this attendance record
   const { data: existingRequest, isLoading: isLoadingRequest } = useOvertimeRequestByAttendance(
@@ -118,13 +127,13 @@ export default function AddOvertimeModal({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
-        return '#F59E0B';
+        return Colors.warning;
       case 'approved':
-        return '#10B981';
+        return Colors.success;
       case 'rejected':
-        return '#EF4444';
+        return Colors.error;
       default:
-        return '#64748B';
+        return Colors.gray500;
     }
   };
 
@@ -132,13 +141,13 @@ export default function AddOvertimeModal({
   const getStatusBgColor = (status: string) => {
     switch (status) {
       case 'pending':
-        return '#FEF3C7';
+        return StatusColors.pending.background;
       case 'approved':
-        return '#D1FAE5';
+        return StatusColors.approved.background;
       case 'rejected':
-        return '#FEE2E2';
+        return StatusColors.rejected.background;
       default:
-        return '#F1F5F9';
+        return Colors.gray100;
     }
   };
 
@@ -186,7 +195,7 @@ export default function AddOvertimeModal({
           {status === 'approved' && existingRequest.approved_hours && (
             <View style={styles.requestDetailRow}>
               <Text style={styles.requestDetailLabel}>Approved Hours</Text>
-              <Text style={[styles.requestDetailValue, { color: '#10B981' }]}>
+              <Text style={[styles.requestDetailValue, { color: Colors.success }]}>
                 {formatHours(existingRequest.approved_hours)}
               </Text>
             </View>
@@ -218,7 +227,7 @@ export default function AddOvertimeModal({
 
         {/* Info message */}
         <View style={styles.infoMessage}>
-          <Ionicons name="information-circle-outline" size={16} color="#64748B" />
+          <Ionicons name="information-circle-outline" size={16} color={Colors.gray500} />
           <Text style={styles.infoMessageText}>
             {status === 'pending'
               ? 'Your request is awaiting HR approval.'
@@ -242,14 +251,20 @@ export default function AddOvertimeModal({
           <View style={styles.modalHeader}>
             <View style={styles.headerLeft}>
               <View style={styles.headerIcon}>
-                <MaterialCommunityIcons name="clock-plus-outline" size={20} color="#8B5CF6" />
+                <MaterialCommunityIcons name="clock-plus-outline" size={20} color={Colors.purple} />
               </View>
               <Text style={styles.modalTitle}>
                 {existingRequest ? 'Overtime Request' : 'Request Overtime'}
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color="#64748B" />
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeButton}
+              accessibilityLabel="Close overtime request modal"
+              accessibilityRole="button"
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={24} color={Colors.gray500} />
             </TouchableOpacity>
           </View>
 
@@ -264,7 +279,7 @@ export default function AddOvertimeModal({
           >
             {isLoadingRequest ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#8B5CF6" />
+                <ActivityIndicator size="large" color={Colors.purple} />
                 <Text style={styles.loadingText}>Loading...</Text>
               </View>
             ) : existingRequest ? (
@@ -275,7 +290,7 @@ export default function AddOvertimeModal({
               <>
                 {/* Info Card */}
                 <View style={styles.infoCard}>
-                  <Ionicons name="information-circle" size={20} color="#8B5CF6" />
+                  <Ionicons name="information-circle" size={20} color={Colors.purple} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.infoTitle}>Overtime Request</Text>
                     <Text style={styles.infoText}>
@@ -295,7 +310,7 @@ export default function AddOvertimeModal({
                   </View>
                   <View style={styles.summaryRow}>
                     <View style={styles.summaryItem}>
-                      <Ionicons name="log-in-outline" size={18} color="#10B981" />
+                      <Ionicons name="log-in-outline" size={18} color={Colors.success} />
                       <Text style={styles.summaryLabel}>Check In</Text>
                       <Text style={styles.summaryValue}>
                         {attendanceRecord.check_in_time
@@ -305,7 +320,7 @@ export default function AddOvertimeModal({
                     </View>
                     <View style={styles.summaryDivider} />
                     <View style={styles.summaryItem}>
-                      <Ionicons name="log-out-outline" size={18} color="#EF4444" />
+                      <Ionicons name="log-out-outline" size={18} color={Colors.error} />
                       <Text style={styles.summaryLabel}>Check Out</Text>
                       <Text style={styles.summaryValue}>
                         {attendanceRecord.check_out_time
@@ -315,9 +330,9 @@ export default function AddOvertimeModal({
                     </View>
                     <View style={styles.summaryDivider} />
                     <View style={styles.summaryItem}>
-                      <Ionicons name="timer-outline" size={18} color="#6366F1" />
+                      <Ionicons name="timer-outline" size={18} color={Colors.indigo} />
                       <Text style={styles.summaryLabel}>Regular</Text>
-                      <Text style={[styles.summaryValue, { color: '#6366F1' }]}>
+                      <Text style={[styles.summaryValue, { color: Colors.indigo }]}>
                         {formatHours(regularHours - (attendanceRecord.overtime_hours || 0))}
                       </Text>
                     </View>
@@ -339,7 +354,9 @@ export default function AddOvertimeModal({
                           onChangeText={handleHoursChange}
                           keyboardType="number-pad"
                           maxLength={2}
-                          placeholderTextColor="#94A3B8"
+                          placeholderTextColor={Colors.textTertiary}
+                          accessibilityLabel="Overtime hours"
+                          accessibilityHint="Enter number of overtime hours, maximum 10"
                         />
                       </View>
                       <Text style={styles.timeInputLabel}>Hours</Text>
@@ -356,7 +373,9 @@ export default function AddOvertimeModal({
                           onChangeText={handleMinutesChange}
                           keyboardType="number-pad"
                           maxLength={2}
-                          placeholderTextColor="#94A3B8"
+                          placeholderTextColor={Colors.textTertiary}
+                          accessibilityLabel="Overtime minutes"
+                          accessibilityHint="Enter number of overtime minutes"
                         />
                       </View>
                       <Text style={styles.timeInputLabel}>Minutes</Text>
@@ -367,7 +386,7 @@ export default function AddOvertimeModal({
                 {/* Selected Overtime Display */}
                 {totalOvertimeHours > 0 && (
                   <View style={styles.selectedDisplay}>
-                    <MaterialCommunityIcons name="clock-plus-outline" size={20} color="#8B5CF6" />
+                    <MaterialCommunityIcons name="clock-plus-outline" size={20} color={Colors.purple} />
                     <Text style={styles.selectedDisplayText}>
                       Total: {parsedHours}h {parsedMinutes}m overtime
                     </Text>
@@ -383,19 +402,31 @@ export default function AddOvertimeModal({
                     <MaterialCommunityIcons
                       name="text"
                       size={18}
-                      color="#64748B"
+                      color={Colors.gray500}
                       style={styles.textAreaIcon}
                     />
                     <TextInput
                       style={[styles.input, styles.textArea]}
                       placeholder="e.g., Project deadline, Extra work, Client meeting"
                       value={overtimeReason}
-                      onChangeText={setOvertimeReason}
+                      onChangeText={(text) => setOvertimeReason(text.slice(0, MAX_REASON_LENGTH))}
                       multiline
                       numberOfLines={3}
                       textAlignVertical="top"
-                      placeholderTextColor="#94A3B8"
+                      placeholderTextColor={Colors.textTertiary}
+                      accessibilityLabel="Overtime reason, optional"
+                      accessibilityHint="Enter the reason for overtime"
                     />
+                  </View>
+                  {/* Character counter */}
+                  <View style={styles.fieldFooter}>
+                    <View />
+                    <Text style={[
+                      styles.charCount,
+                      overtimeReason.length >= MAX_REASON_LENGTH * 0.9 && styles.charCountWarning
+                    ]}>
+                      {overtimeReason.length}/{MAX_REASON_LENGTH}
+                    </Text>
                   </View>
                 </View>
               </>
@@ -408,6 +439,8 @@ export default function AddOvertimeModal({
               style={[styles.footerButton, styles.cancelFooterButton]}
               onPress={onClose}
               activeOpacity={0.8}
+              accessibilityLabel={existingRequest ? "Close" : "Cancel"}
+              accessibilityRole="button"
             >
               <Text style={styles.cancelFooterButtonText}>
                 {existingRequest ? 'Close' : 'Cancel'}
@@ -424,12 +457,15 @@ export default function AddOvertimeModal({
                 onPress={handleSubmit}
                 disabled={!canSubmit || createRequestMutation.isPending}
                 activeOpacity={0.8}
+                accessibilityLabel={createRequestMutation.isPending ? "Submitting request" : "Submit overtime request"}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !canSubmit || createRequestMutation.isPending }}
               >
                 {createRequestMutation.isPending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={Colors.textInverse} />
                 ) : (
                   <>
-                    <MaterialCommunityIcons name="send" size={18} color="#FFFFFF" />
+                    <MaterialCommunityIcons name="send" size={18} color={Colors.textInverse} />
                     <Text style={styles.submitFooterButtonText}>Submit Request</Text>
                   </>
                 )}
@@ -449,44 +485,44 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: Colors.background,
+    borderTopLeftRadius: BorderRadius["3xl"],
+    borderTopRightRadius: BorderRadius["3xl"],
     height: '85%',
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: Colors.border,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: Spacing.sm,
     flex: 1,
   },
   headerIcon: {
     width: 36,
     height: 36,
-    borderRadius: 10,
-    backgroundColor: '#FAF5FF',
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.purpleLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.text,
   },
   closeButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: Colors.gray100,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -494,42 +530,42 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalContentContainer: {
-    padding: 20,
+    padding: Spacing.xl,
     flexGrow: 1,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
+    gap: Spacing.md,
   },
   loadingText: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.gray500,
   },
   existingRequestContainer: {
-    gap: 16,
+    gap: Spacing.lg,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.lg,
   },
   statusText: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
   },
   requestDetailsCard: {
-    backgroundColor: '#F8FAFC',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: Colors.backgroundSecondary,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 12,
+    borderColor: Colors.border,
+    gap: Spacing.md,
   },
   requestDetailRow: {
     flexDirection: 'row',
@@ -537,47 +573,47 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   requestDetailLabel: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.gray500,
     flex: 1,
   },
   requestDetailValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0F172A',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.text,
     flex: 2,
     textAlign: 'right',
   },
   infoMessage: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: '#F1F5F9',
-    padding: 12,
-    borderRadius: 8,
+    gap: Spacing.sm,
+    backgroundColor: Colors.gray100,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
   },
   infoMessageText: {
     flex: 1,
     fontSize: 13,
-    color: '#64748B',
+    color: Colors.gray500,
     lineHeight: 18,
   },
   infoCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
-    backgroundColor: '#FAF5FF',
-    padding: 14,
-    borderRadius: 12,
+    gap: Spacing.md,
+    backgroundColor: Colors.purpleLight,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
     borderColor: '#E9D5FF',
-    marginBottom: 16,
+    marginBottom: Spacing.lg,
   },
   infoTitle: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
     color: '#6B21A8',
-    marginBottom: 4,
+    marginBottom: Spacing.xs,
   },
   infoText: {
     fontSize: 13,
@@ -585,36 +621,36 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   summaryCard: {
-    backgroundColor: '#F8FAFC',
-    padding: 14,
-    borderRadius: 12,
+    backgroundColor: Colors.backgroundSecondary,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 12,
-    marginBottom: 16,
+    borderColor: Colors.border,
+    gap: Spacing.md,
+    marginBottom: Spacing.lg,
   },
   summaryTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#64748B',
-    marginBottom: 4,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.gray500,
+    marginBottom: Spacing.xs,
   },
   summaryDateRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingBottom: 10,
+    paddingBottom: Spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: Colors.border,
   },
   summaryDateLabel: {
     fontSize: 13,
-    color: '#64748B',
+    color: Colors.gray500,
   },
   summaryDateValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0F172A',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.text,
   },
   summaryRow: {
     flexDirection: 'row',
@@ -625,108 +661,121 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 4,
+    gap: Spacing.xs,
   },
   summaryDivider: {
     width: 1,
     height: 40,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: Colors.border,
   },
   summaryLabel: {
     fontSize: 11,
-    color: '#64748B',
+    color: Colors.gray500,
     textAlign: 'center',
   },
   summaryValue: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.text,
     textAlign: 'center',
   },
   inputGroup: {
-    gap: 8,
-    marginBottom: 16,
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#334155',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.gray700,
   },
   hint: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: '#94A3B8',
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.regular,
+    color: Colors.textTertiary,
   },
   timeInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    gap: Spacing.md,
   },
   timeInputContainer: {
     alignItems: 'center',
-    gap: 6,
+    gap: Spacing.xs,
   },
   timeInputWrapper: {
     width: 80,
     height: 60,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: BorderRadius.lg,
     borderWidth: 2,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
   timeInput: {
     fontSize: 28,
-    fontWeight: '700',
-    color: '#8B5CF6',
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.purple,
     textAlign: 'center',
     width: '100%',
   },
   timeInputLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748B',
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.gray500,
   },
   timeSeparator: {
     fontSize: 32,
-    fontWeight: '700',
-    color: '#8B5CF6',
-    marginBottom: 20,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.purple,
+    marginBottom: Spacing.xl,
   },
   selectedDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#FAF5FF',
-    padding: 12,
-    borderRadius: 10,
+    gap: Spacing.sm,
+    backgroundColor: Colors.purpleLight,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
     borderColor: '#E9D5FF',
-    marginBottom: 16,
+    marginBottom: Spacing.lg,
   },
   selectedDisplayText: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
     color: '#6B21A8',
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 10,
+    borderColor: Colors.border,
+    gap: Spacing.sm,
+  },
+  fieldFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Spacing.xs,
+  },
+  charCount: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textTertiary,
+  },
+  charCountWarning: {
+    color: Colors.warning,
   },
   input: {
     flex: 1,
-    fontSize: 16,
-    color: '#0F172A',
-    fontWeight: '400',
+    fontSize: Typography.fontSize.base,
+    color: Colors.text,
+    fontWeight: Typography.fontWeight.regular,
   },
   textAreaWrapper: {
     alignItems: 'flex-start',
@@ -740,34 +789,34 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
-    padding: 16,
+    padding: Spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    gap: 12,
-    backgroundColor: '#FFFFFF',
+    borderTopColor: Colors.border,
+    gap: Spacing.md,
+    backgroundColor: Colors.background,
   },
   footerButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 6,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    gap: Spacing.xs,
   },
   cancelFooterButton: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: Colors.gray100,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
   },
   cancelFooterButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#64748B',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.gray500,
   },
   submitFooterButton: {
-    backgroundColor: '#8B5CF6',
-    shadowColor: '#8B5CF6',
+    backgroundColor: Colors.purple,
+    shadowColor: Colors.purple,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -777,8 +826,8 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   submitFooterButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.textInverse,
   },
 });

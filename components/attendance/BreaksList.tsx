@@ -3,6 +3,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Text } from '@/components/ui/Text';
 import { AttendanceBreak } from '@/lib/types';
 import { formatTime } from '@/lib/utils/date.utils';
+import { Colors, Spacing, BorderRadius, StatusColors } from '@/constants/theme';
 
 interface BreaksListProps {
   breaks: AttendanceBreak[];
@@ -15,7 +16,7 @@ export default function BreaksList({ breaks, onEdit, onDelete, editable = false 
   if (!breaks || breaks.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <MaterialCommunityIcons name="coffee-outline" size={32} color="#CBD5E1" />
+        <MaterialCommunityIcons name="coffee-outline" size={32} color={Colors.gray300} />
         <Text style={styles.emptyText}>No breaks recorded</Text>
       </View>
     );
@@ -33,7 +34,7 @@ export default function BreaksList({ breaks, onEdit, onDelete, editable = false 
           <View key={index} style={styles.breakCard}>
             <View style={styles.breakHeader}>
               <View style={styles.breakIcon}>
-                <MaterialCommunityIcons name="coffee" size={20} color="#F59E0B" />
+                <MaterialCommunityIcons name="coffee" size={20} color={Colors.warning} />
               </View>
               <View style={styles.breakInfo}>
                 <Text style={styles.breakTitle}>Break {index + 1}</Text>
@@ -49,8 +50,11 @@ export default function BreaksList({ breaks, onEdit, onDelete, editable = false 
                       style={styles.actionButton}
                       onPress={() => onEdit(index, breakItem)}
                       activeOpacity={0.7}
+                      accessibilityLabel={`Edit break ${index + 1}`}
+                      accessibilityRole="button"
+                      accessibilityHint="Opens editor to modify this break"
                     >
-                      <Ionicons name="pencil" size={18} color="#6366F1" />
+                      <Ionicons name="pencil" size={18} color={Colors.indigo} />
                     </TouchableOpacity>
                   )}
                   {onDelete && (
@@ -58,8 +62,11 @@ export default function BreaksList({ breaks, onEdit, onDelete, editable = false 
                       style={[styles.actionButton, styles.deleteButton]}
                       onPress={() => onDelete(index)}
                       activeOpacity={0.7}
+                      accessibilityLabel={`Delete break ${index + 1}`}
+                      accessibilityRole="button"
+                      accessibilityHint="Removes this break from the record"
                     >
-                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                      <Ionicons name="trash-outline" size={18} color={Colors.error} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -68,12 +75,12 @@ export default function BreaksList({ breaks, onEdit, onDelete, editable = false 
 
             <View style={styles.breakDetails}>
               <View style={styles.timeRow}>
-                <Ionicons name="play-circle-outline" size={16} color="#10B981" />
+                <Ionicons name="play-circle-outline" size={16} color={Colors.success} />
                 <Text style={styles.timeLabel}>Start:</Text>
                 <Text style={styles.timeValue}>{formatTime(startTime)}</Text>
               </View>
               <View style={styles.timeRow}>
-                <Ionicons name="stop-circle-outline" size={16} color="#EF4444" />
+                <Ionicons name="stop-circle-outline" size={16} color={Colors.error} />
                 <Text style={styles.timeLabel}>End:</Text>
                 <Text style={styles.timeValue}>{formatTime(endTime)}</Text>
               </View>
@@ -94,44 +101,44 @@ export default function BreaksList({ breaks, onEdit, onDelete, editable = false 
 
 const styles = StyleSheet.create({
   container: {
-    gap: 12,
+    gap: Spacing.md,
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
+    padding: Spacing['2xl'],
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
     borderStyle: 'dashed',
   },
   emptyText: {
     fontSize: 14,
-    color: '#94A3B8',
-    marginTop: 8,
+    color: Colors.gray400,
+    marginTop: Spacing.sm,
     fontWeight: '500',
   },
   breakCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 14,
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Colors.border,
   },
   breakHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: Spacing.md,
   },
   breakIcon: {
     width: 36,
     height: 36,
-    borderRadius: 8,
-    backgroundColor: '#FEF3C7',
+    borderRadius: BorderRadius.md,
+    backgroundColor: StatusColors.pending.background,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: Spacing.md,
   },
   breakInfo: {
     flex: 1,
@@ -139,64 +146,64 @@ const styles = StyleSheet.create({
   breakTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0F172A',
+    color: Colors.text,
     marginBottom: 2,
   },
   breakDuration: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#F59E0B',
+    color: Colors.warning,
   },
   breakActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: Spacing.sm,
   },
   actionButton: {
     width: 32,
     height: 32,
-    borderRadius: 8,
-    backgroundColor: '#EEF2FF',
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.indigoLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
   deleteButton: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: StatusColors.rejected.background,
   },
   breakDetails: {
-    gap: 8,
-    marginBottom: 8,
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
   },
   timeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: Spacing.sm,
   },
   timeLabel: {
     fontSize: 13,
-    color: '#64748B',
+    color: Colors.gray500,
     fontWeight: '500',
     minWidth: 40,
   },
   timeValue: {
     fontSize: 13,
-    color: '#0F172A',
+    color: Colors.text,
     fontWeight: '600',
   },
   notesContainer: {
-    marginTop: 8,
-    paddingTop: 8,
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: Colors.gray100,
   },
   notesLabel: {
     fontSize: 12,
-    color: '#64748B',
+    color: Colors.gray500,
     fontWeight: '600',
     marginBottom: 4,
   },
   notesText: {
     fontSize: 12,
-    color: '#334155',
+    color: Colors.gray700,
     lineHeight: 18,
   },
 });

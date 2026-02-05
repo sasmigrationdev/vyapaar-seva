@@ -1,5 +1,5 @@
 import { Text } from "@/components/ui/Text";
-import { BorderRadius, Colors, Spacing, Typography } from "@/constants/theme";
+import { BorderRadius, Colors, Shadows, Spacing, Typography } from "@/constants/theme";
 import { useAuth } from "@/hooks/auth/useAuth";
 import { useSignOut } from "@/hooks/mutations/useAuthMutations";
 import {
@@ -8,15 +8,20 @@ import {
 } from "@/hooks/mutations/useSessionMutations";
 import { useResetPassword } from "@/hooks/mutations/useUserMutations";
 import { useAllSessions, useSessionCount } from "@/hooks/queries/useSessions";
+import { useCurrentOrganization, useOrganizationStats } from "@/hooks/queries/useOrganization";
+import { usePendingJoinRequests } from "@/hooks/queries/useEmployerRequests";
+import { usePendingBreakRequests } from "@/hooks/queries/useBreakRequests";
+import { usePendingOvertimeCount } from "@/hooks/queries/useOvertimeRequests";
+import { useHRPendingLeaveRequests } from "@/hooks/queries/useLeave";
 import { formatDate } from "@/lib/utils/date.utils";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import { formatDistanceToNow } from "date-fns";
-import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Clipboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -28,12 +33,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useAlert } from "@/hooks/useAlert";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { LocalAuthSettings } from "@/components/localAuth/LocalAuthSettings";
+import ProfileHero from "@/components/profile/ProfileHero";
+import ProfileActionBar from "@/components/profile/ProfileActionBar";
 
 export default function HRProfileScreen() {
+  const router = useRouter();
   const { user } = useAuth();
   const { success, error, confirmDestructive } = useAlert();
   const signOutMutation = useSignOut();
@@ -47,7 +55,6 @@ export default function HRProfileScreen() {
     error: pushError,
     isRegistering,
     isExpoGo,
-    permissionStatus,
     retryRegistration,
   } = usePushNotifications();
 
@@ -58,6 +65,22 @@ export default function HRProfileScreen() {
     isLoading: sessionsLoading,
     refetch: refetchSessions,
   } = useAllSessions();
+
+  // Organization data
+  const { data: organization } = useCurrentOrganization();
+  const organizationId = user?.organization_id || "";
+  const { data: orgStats } = useOrganizationStats(organizationId);
+
+  // Pending requests for badges
+  const { data: pendingJoinRequests } = usePendingJoinRequests(organizationId);
+  const { data: pendingBreakRequests } = usePendingBreakRequests(organizationId);
+  const { data: pendingOvertimeCount } = usePendingOvertimeCount(organizationId);
+  const { data: pendingLeaves } = useHRPendingLeaveRequests(organizationId);
+
+  const pendingJoinCount = pendingJoinRequests?.length || 0;
+  const pendingBreakCount = pendingBreakRequests?.length || 0;
+  const pendingOvertimeRequestsCount = pendingOvertimeCount || 0;
+  const pendingLeavesCount = pendingLeaves?.length || 0;
 
   const [refreshing, setRefreshing] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -76,9 +99,7 @@ export default function HRProfileScreen() {
 
     const fullOs = `${osName} ${osVersion}`;
 
-    // Check if it's a long technical name (contains / or _ or is too long)
     if (fullOs.length > 12 || osVersion.includes("/") || osVersion.includes("_") || osVersion.includes("-")) {
-      // Extract part before first slash, or major version number
       const beforeSlash = osVersion.split("/")[0].trim();
       const shortOs = `${osName} ${beforeSlash}`;
       return { short: shortOs, full: fullOs, needsTruncation: true };
@@ -101,7 +122,6 @@ export default function HRProfileScreen() {
     setRefreshing(false);
   };
 
-  // Refetch sessions when modal opens
   const handleOpenDevicesModal = () => {
     setShowDevicesModal(true);
     refetchSessions();
@@ -179,42 +199,6 @@ export default function HRProfileScreen() {
     );
   };
 
-  const handleRevokeSession = (
-    sessionId: string,
-    deviceName: string,
-    isCurrent: boolean
-  ) => {
-    if (isCurrent) {
-      confirmDestructive(
-        "Sign Out This Device",
-        "This will sign you out from this device. You will need to sign in again.",
-        () => signOutMutation.mutate(),
-        undefined,
-        "Sign Out"
-      );
-      return;
-    }
-
-    confirmDestructive(
-      "Remove Device",
-      `Sign out from ${deviceName}?`,
-      () => {
-        revokeSessionMutation.mutate(sessionId, {
-          onSuccess: () => {
-            success("Success", `Signed out from ${deviceName}`);
-            refetchSessions();
-            refetchCount();
-          },
-          onError: (err) => {
-            error("Error", err.message || "Failed to remove device");
-          },
-        });
-      },
-      undefined,
-      "Remove"
-    );
-  };
-
   const handleEnablePushNotifications = async () => {
     const result = await retryRegistration();
     if (result) {
@@ -225,6 +209,13 @@ export default function HRProfileScreen() {
       error("Error", pushError);
     } else {
       error("Error", "Failed to enable push notifications. Please check your device settings.");
+    }
+  };
+
+  const handleCopyEmployerCode = () => {
+    if (organization?.employer_code) {
+      Clipboard.setString(organization.employer_code);
+      success("Copied!", "Employer code copied to clipboard. Share this with employees to join your organization.");
     }
   };
 
@@ -249,356 +240,410 @@ export default function HRProfileScreen() {
           />
         }
       >
-        <LinearGradient
-          colors={[Colors.primaryDark, Colors.primary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.heroSection}
-        >
-          <SafeAreaView edges={["top"]} style={styles.heroContent}>
-            <View style={styles.heroHeaderRow}>
-              <View style={styles.heroTextBlock}>
-                <Text style={styles.heroGreeting}>{user?.full_name}</Text>
-                <Text style={styles.heroEmail}>{user?.email}</Text>
-              </View>
+        {/* Hero Section */}
+        <ProfileHero user={user} />
 
-              <View style={styles.avatarButton}>
-                <Text style={styles.avatarLetter}>
-                  {user?.full_name?.charAt(0).toUpperCase()}
-                </Text>
+        {/* Bento Stats Card - Floating over hero */}
+        <Animated.View
+          entering={FadeInDown.delay(100).springify()}
+          style={styles.bentoStatsContainer}
+        >
+          <View style={styles.bentoStatsCard}>
+            {/* Organization or Role */}
+            <View style={styles.bentoStatItem}>
+              <View style={[styles.bentoStatIcon, { backgroundColor: organization ? Colors.success + "15" : Colors.primary + "15" }]}>
+                {organization ? (
+                  <MaterialCommunityIcons name="domain" size={18} color={Colors.success} />
+                ) : (
+                  <MaterialCommunityIcons name="shield-account" size={18} color={Colors.primary} />
+                )}
               </View>
+              <Text
+                style={[
+                  styles.bentoStatValue,
+                  organization && styles.bentoStatValueSmall,
+                ]}
+                numberOfLines={2}
+                ellipsizeMode="tail"
+              >
+                {organization?.name || user?.role?.toUpperCase() || "HR"}
+              </Text>
+              <Text style={styles.bentoStatLabel}>
+                {organization ? "Organization" : "Role"}
+              </Text>
             </View>
 
-            <View style={styles.heroMetricsRow}>
-              <View style={[styles.heroMetricCard, styles.heroMetricPrimary]}>
-                <View
-                  style={[styles.heroMetricIcon, styles.heroMetricIconOverlay]}
-                >
-                  <MaterialCommunityIcons
-                    name="shield-account"
-                    size={22}
-                    color={Colors.textInverse}
-                  />
-                </View>
-                <View style={styles.heroMetricContent}>
-                  <Text style={styles.heroMetricLabel}>role</Text>
-                  <Text style={styles.heroMetricValue}>
-                    {user?.role?.toUpperCase() || "HR"}
-                  </Text>
-                </View>
-              </View>
+            <View style={styles.bentoStatDivider} />
 
-              <View style={[styles.heroMetricCard, styles.heroMetricSecondary]}>
-                <View
-                  style={[styles.heroMetricIcon, styles.heroMetricIconOverlay]}
-                >
-                  <Feather
-                    name="calendar"
-                    size={22}
-                    color={Colors.textInverse}
-                  />
-                </View>
-                <View style={styles.heroMetricContent}>
-                  <Text style={styles.heroMetricLabel}>joined</Text>
-                  <Text style={styles.heroMetricValue} numberOfLines={1}>
-                    {user?.created_at
-                      ? formatDate(new Date(user.created_at))
-                      : "N/A"}
-                  </Text>
-                </View>
+            {/* Role (if org shown) or Joined */}
+            <View style={styles.bentoStatItem}>
+              <View style={[styles.bentoStatIcon, { backgroundColor: organization ? Colors.primary + "15" : Colors.info + "15" }]}>
+                {organization ? (
+                  <MaterialCommunityIcons name="shield-account" size={18} color={Colors.primary} />
+                ) : (
+                  <Feather name="calendar" size={18} color={Colors.info} />
+                )}
               </View>
+              <Text style={styles.bentoStatValue} numberOfLines={1}>
+                {organization
+                  ? (user?.role?.toUpperCase() || "HR")
+                  : (user?.created_at ? formatDate(new Date(user.created_at)) : "N/A")}
+              </Text>
+              <Text style={styles.bentoStatLabel}>
+                {organization ? "Role" : "Joined"}
+              </Text>
+            </View>
 
+            <View style={styles.bentoStatDivider} />
+
+            {/* Devices - Tappable */}
+            <TouchableOpacity
+              style={styles.bentoStatItem}
+              onPress={handleOpenDevicesModal}
+              activeOpacity={0.7}
+              accessibilityLabel={`${sessionCount} active ${sessionCount === 1 ? 'device' : 'devices'}, tap to manage`}
+              accessibilityRole="button"
+            >
+              <View style={[styles.bentoStatIcon, { backgroundColor: Colors.info + "15" }]}>
+                <MaterialCommunityIcons name="devices" size={18} color={Colors.info} />
+              </View>
+              <Text style={styles.bentoStatValue}>{sessionCount}</Text>
+              <Text style={styles.bentoStatLabel}>
+                {sessionCount === 1 ? "Device" : "Devices"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+
+        {/* Organization Information */}
+        {organization && (
+          <Animated.View
+            entering={FadeInDown.delay(150).springify()}
+            style={styles.section}
+          >
+            <Text style={styles.sectionTitle}>Organization</Text>
+            <View style={styles.settingsCard}>
+              {/* Employer Code - Tappable to copy */}
               <TouchableOpacity
-                style={[styles.heroMetricCard, styles.heroMetricTertiary]}
-                onPress={handleOpenDevicesModal}
-                activeOpacity={0.7}
+                style={styles.settingsItem}
+                onPress={handleCopyEmployerCode}
+                activeOpacity={0.6}
+                accessibilityLabel={`Employer Code: ${organization.employer_code}. Tap to copy.`}
+                accessibilityRole="button"
               >
-                <View
-                  style={[styles.heroMetricIcon, styles.heroMetricIconOverlay]}
-                >
-                  <MaterialCommunityIcons
-                    name="devices"
-                    size={22}
-                    color={Colors.textInverse}
-                  />
+                <View style={[styles.settingsItemIcon, { backgroundColor: Colors.primary + "12" }]}>
+                  <MaterialCommunityIcons name="qrcode" size={20} color={Colors.primary} />
                 </View>
-                <View style={styles.heroMetricContent}>
-                  <Text style={styles.heroMetricLabel}>devices</Text>
-                  <Text style={styles.heroMetricValue}>{sessionCount}</Text>
+                <View style={styles.settingsItemContent}>
+                  <Text style={styles.settingsItemLabel}>Employer Code</Text>
+                  <Text style={styles.employerCodeValue}>{organization.employer_code || "Not set"}</Text>
+                </View>
+                <View style={styles.copyButton}>
+                  <Ionicons name="copy-outline" size={18} color={Colors.primary} />
+                  <Text style={styles.copyButtonText}>Copy</Text>
                 </View>
               </TouchableOpacity>
+
+              <View style={styles.settingsDivider} />
+
+              {/* Team Size */}
+              <View style={styles.settingsItem}>
+                <View style={[styles.settingsItemIcon, { backgroundColor: Colors.secondary + "12" }]}>
+                  <MaterialCommunityIcons name="account-group" size={20} color={Colors.secondary} />
+                </View>
+                <View style={styles.settingsItemContent}>
+                  <Text style={styles.settingsItemLabel}>Team Size</Text>
+                  <Text style={styles.settingsItemDescription}>
+                    {orgStats?.totalEmployees || 0} members ({orgStats?.activeEmployees || 0} active)
+                  </Text>
+                </View>
+              </View>
+
+              {organization.description && (
+                <>
+                  <View style={styles.settingsDivider} />
+                  <View style={styles.settingsItem}>
+                    <View style={[styles.settingsItemIcon, { backgroundColor: Colors.info + "12" }]}>
+                      <MaterialCommunityIcons name="text-box-outline" size={20} color={Colors.info} />
+                    </View>
+                    <View style={styles.settingsItemContent}>
+                      <Text style={styles.settingsItemLabel}>Description</Text>
+                      <Text style={styles.settingsItemDescription} numberOfLines={2}>
+                        {organization.description}
+                      </Text>
+                    </View>
+                  </View>
+                </>
+              )}
+
+              <View style={styles.settingsDivider} />
+
+              {/* Created Date */}
+              <View style={styles.settingsItem}>
+                <View style={[styles.settingsItemIcon, { backgroundColor: Colors.gray200 }]}>
+                  <Feather name="calendar" size={18} color={Colors.textSecondary} />
+                </View>
+                <View style={styles.settingsItemContent}>
+                  <Text style={styles.settingsItemLabel}>Created</Text>
+                  <Text style={styles.settingsItemDescription}>
+                    {organization.created_at ? formatDate(new Date(organization.created_at)) : "N/A"}
+                  </Text>
+                </View>
+              </View>
             </View>
-          </SafeAreaView>
-        </LinearGradient>
+          </Animated.View>
+        )}
 
-        <View style={[styles.sectionBlock, styles.sectionBlockFirst]}>
-          <Text style={styles.sectionTitle}>Personal Information</Text>
-
-          <View style={styles.groupedList}>
-            <View style={styles.listItem}>
-              <Text style={styles.listLabel}>Phone</Text>
-              <Text style={styles.listValue} numberOfLines={1}>
-                {user?.phone || "Not provided"}
-              </Text>
+        {/* Contact Info - Only show if phone is available */}
+        {user?.phone && (
+          <Animated.View
+            entering={FadeInDown.delay(organization ? 200 : 150).springify()}
+            style={styles.section}
+          >
+            <Text style={styles.sectionTitle}>Contact</Text>
+            <View style={styles.settingsCard}>
+              <View style={styles.settingsItem}>
+                <View style={[styles.settingsItemIcon, { backgroundColor: Colors.success + "12" }]}>
+                  <Ionicons name="call-outline" size={20} color={Colors.success} />
+                </View>
+                <View style={styles.settingsItemContent}>
+                  <Text style={styles.settingsItemLabel}>Phone</Text>
+                  <Text style={styles.settingsItemDescription}>{user.phone}</Text>
+                </View>
+              </View>
             </View>
+          </Animated.View>
+        )}
 
-            <View style={styles.divider} />
-
-            <View style={styles.listItem}>
-              <Text style={styles.listLabel}>Department</Text>
-              <Text style={styles.listValue} numberOfLines={1}>
-                {user?.department || "Not assigned"}
-              </Text>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.listItem}>
-              <Text style={styles.listLabel}>Designation</Text>
-              <Text style={styles.listValue} numberOfLines={1}>
-                {user?.designation || "Not assigned"}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.sectionBlock}>
-          <Text style={styles.sectionTitle}>Account</Text>
-
-          <View style={styles.groupedList}>
-            <View style={styles.listItem}>
-              <Text style={styles.listLabel}>Joined</Text>
-              <Text style={styles.listValue} numberOfLines={1}>
-                {user?.created_at ? formatDate(new Date(user.created_at)) : "-"}
-              </Text>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.listItem}>
-              <Text style={styles.listLabel}>Last Updated</Text>
-              <Text style={styles.listValue} numberOfLines={1}>
-                {user?.updated_at ? formatDate(new Date(user.updated_at)) : "-"}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.sectionBlock}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-
-          <View style={styles.groupedList}>
+        {/* Organization Settings */}
+        <Animated.View
+          entering={FadeInDown.delay(250).springify()}
+          style={styles.section}
+        >
+          <Text style={styles.sectionTitle}>Organization Settings</Text>
+          <View style={styles.settingsCard}>
             <TouchableOpacity
-              style={styles.actionItem}
+              style={styles.settingsItem}
               onPress={() => router.push("/(hr)/wifi-networks")}
               activeOpacity={0.6}
+              accessibilityLabel="WiFi Networks: Configure office WiFi for attendance"
+              accessibilityRole="button"
             >
-              <Ionicons name="wifi" size={22} color={Colors.primary} />
-              <View style={styles.actionContent}>
-                <Text style={styles.actionLabel}>WiFi Networks</Text>
-                <Text style={styles.actionDescription}>
-                  Configure office WiFi
-                </Text>
+              <View style={[styles.settingsItemIcon, { backgroundColor: Colors.info + "12" }]}>
+                <MaterialCommunityIcons name="wifi-cog" size={20} color={Colors.info} />
               </View>
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={Colors.gray300}
-              />
+              <View style={styles.settingsItemContent}>
+                <Text style={styles.settingsItemLabel}>WiFi Networks</Text>
+                <Text style={styles.settingsItemDescription}>Configure office WiFi for attendance</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={Colors.gray300} />
             </TouchableOpacity>
 
-            <View style={styles.divider} />
+            <View style={styles.settingsDivider} />
 
             <TouchableOpacity
-              style={styles.actionItem}
-              onPress={() => router.push("/(hr)/employees")}
+              style={styles.settingsItem}
+              onPress={() => router.push("/(hr)/categories")}
               activeOpacity={0.6}
+              accessibilityLabel="Categories: Manage cashbook categories"
+              accessibilityRole="button"
             >
-              <MaterialCommunityIcons
-                name="account-group"
-                size={22}
-                color={Colors.primary}
-              />
-              <View style={styles.actionContent}>
-                <Text style={styles.actionLabel}>Manage Employees</Text>
-                <Text style={styles.actionDescription}>
-                  View employee details
-                </Text>
+              <View style={[styles.settingsItemIcon, { backgroundColor: Colors.warning + "12" }]}>
+                <MaterialCommunityIcons name="shape-outline" size={20} color={Colors.warning} />
               </View>
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={Colors.gray300}
-              />
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            <TouchableOpacity
-              style={styles.actionItem}
-              onPress={() => router.push("/(hr)/join-requests")}
-              activeOpacity={0.6}
-            >
-              <MaterialCommunityIcons
-                name="account-multiple-plus"
-                size={22}
-                color={Colors.primary}
-              />
-              <View style={styles.actionContent}>
-                <Text style={styles.actionLabel}>Join Requests</Text>
-                <Text style={styles.actionDescription}>
-                  Review pending approvals
-                </Text>
+              <View style={styles.settingsItemContent}>
+                <Text style={styles.settingsItemLabel}>Categories</Text>
+                <Text style={styles.settingsItemDescription}>Manage cashbook categories</Text>
               </View>
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={Colors.gray300}
-              />
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            <TouchableOpacity
-              style={styles.actionItem}
-              onPress={() => router.push("/(hr)/attendance")}
-              activeOpacity={0.6}
-            >
-              <MaterialCommunityIcons
-                name="clock-check"
-                size={22}
-                color={Colors.primary}
-              />
-              <View style={styles.actionContent}>
-                <Text style={styles.actionLabel}>Attendance</Text>
-                <Text style={styles.actionDescription}>Track records</Text>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={Colors.gray300}
-              />
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            <TouchableOpacity
-              style={styles.actionItem}
-              onPress={() => router.push("/(hr)/salary")}
-              activeOpacity={0.6}
-            >
-              <MaterialCommunityIcons
-                name="wallet"
-                size={22}
-                color={Colors.primary}
-              />
-              <View style={styles.actionContent}>
-                <Text style={styles.actionLabel}>Salary Management</Text>
-                <Text style={styles.actionDescription}>Manage salaries</Text>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={Colors.gray300}
-              />
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            <TouchableOpacity
-              style={styles.actionItem}
-              onPress={() => router.push("/(hr)/breaks")}
-              activeOpacity={0.6}
-            >
-              <MaterialCommunityIcons
-                name="coffee"
-                size={22}
-                color={Colors.primary}
-              />
-              <View style={styles.actionContent}>
-                <Text style={styles.actionLabel}>Break Management</Text>
-                <Text style={styles.actionDescription}>
-                  Add and manage employee breaks
-                </Text>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={Colors.gray300}
-              />
+              <Ionicons name="chevron-forward" size={18} color={Colors.gray300} />
             </TouchableOpacity>
           </View>
-        </View>
+        </Animated.View>
 
-        <View style={styles.sectionBlock}>
-          <Text style={styles.sectionTitle}>Security</Text>
-
-          <View style={styles.groupedList}>
+        {/* Management Quick Links */}
+        <Animated.View
+          entering={FadeInDown.delay(300).springify()}
+          style={styles.section}
+        >
+          <Text style={styles.sectionTitle}>Management</Text>
+          <View style={styles.settingsCard}>
             <TouchableOpacity
-              style={styles.actionItem}
+              style={styles.settingsItem}
+              onPress={() => router.push("/(hr)/join-requests")}
+              activeOpacity={0.6}
+              accessibilityLabel={`Join Requests: ${pendingJoinCount > 0 ? `${pendingJoinCount} pending` : 'All clear'}`}
+              accessibilityRole="button"
+            >
+              <View style={[styles.settingsItemIcon, { backgroundColor: Colors.primary + "12" }]}>
+                <MaterialCommunityIcons name="account-multiple-plus" size={20} color={Colors.primary} />
+              </View>
+              <View style={styles.settingsItemContent}>
+                <Text style={styles.settingsItemLabel}>Join Requests</Text>
+                <Text style={styles.settingsItemDescription}>
+                  {pendingJoinCount > 0 ? `${pendingJoinCount} pending` : 'All clear'}
+                </Text>
+              </View>
+              {pendingJoinCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{pendingJoinCount}</Text>
+                </View>
+              )}
+              <Ionicons name="chevron-forward" size={18} color={Colors.gray300} />
+            </TouchableOpacity>
+
+            <View style={styles.settingsDivider} />
+
+            <TouchableOpacity
+              style={styles.settingsItem}
+              onPress={() => router.push("/(hr)/leave")}
+              activeOpacity={0.6}
+              accessibilityLabel={`Leave Requests: ${pendingLeavesCount > 0 ? `${pendingLeavesCount} pending` : 'All clear'}`}
+              accessibilityRole="button"
+            >
+              <View style={[styles.settingsItemIcon, { backgroundColor: Colors.error + "12" }]}>
+                <MaterialCommunityIcons name="palm-tree" size={20} color={Colors.error} />
+              </View>
+              <View style={styles.settingsItemContent}>
+                <Text style={styles.settingsItemLabel}>Leave Requests</Text>
+                <Text style={styles.settingsItemDescription}>
+                  {pendingLeavesCount > 0 ? `${pendingLeavesCount} pending` : 'All clear'}
+                </Text>
+              </View>
+              {pendingLeavesCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{pendingLeavesCount}</Text>
+                </View>
+              )}
+              <Ionicons name="chevron-forward" size={18} color={Colors.gray300} />
+            </TouchableOpacity>
+
+            <View style={styles.settingsDivider} />
+
+            <TouchableOpacity
+              style={styles.settingsItem}
+              onPress={() => router.push("/(hr)/break-requests")}
+              activeOpacity={0.6}
+              accessibilityLabel={`Break Requests: ${pendingBreakCount > 0 ? `${pendingBreakCount} pending` : 'All clear'}`}
+              accessibilityRole="button"
+            >
+              <View style={[styles.settingsItemIcon, { backgroundColor: Colors.cyan + "12" }]}>
+                <MaterialCommunityIcons name="coffee" size={20} color={Colors.cyan} />
+              </View>
+              <View style={styles.settingsItemContent}>
+                <Text style={styles.settingsItemLabel}>Break Requests</Text>
+                <Text style={styles.settingsItemDescription}>
+                  {pendingBreakCount > 0 ? `${pendingBreakCount} pending` : 'All clear'}
+                </Text>
+              </View>
+              {pendingBreakCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{pendingBreakCount}</Text>
+                </View>
+              )}
+              <Ionicons name="chevron-forward" size={18} color={Colors.gray300} />
+            </TouchableOpacity>
+
+            <View style={styles.settingsDivider} />
+
+            <TouchableOpacity
+              style={styles.settingsItem}
+              onPress={() => router.push("/(hr)/overtime-requests")}
+              activeOpacity={0.6}
+              accessibilityLabel={`Overtime Requests: ${pendingOvertimeRequestsCount > 0 ? `${pendingOvertimeRequestsCount} pending` : 'All clear'}`}
+              accessibilityRole="button"
+            >
+              <View style={[styles.settingsItemIcon, { backgroundColor: Colors.purple + "12" }]}>
+                <MaterialCommunityIcons name="clock-plus-outline" size={20} color={Colors.purple} />
+              </View>
+              <View style={styles.settingsItemContent}>
+                <Text style={styles.settingsItemLabel}>Overtime Requests</Text>
+                <Text style={styles.settingsItemDescription}>
+                  {pendingOvertimeRequestsCount > 0 ? `${pendingOvertimeRequestsCount} pending` : 'All clear'}
+                </Text>
+              </View>
+              {pendingOvertimeRequestsCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{pendingOvertimeRequestsCount}</Text>
+                </View>
+              )}
+              <Ionicons name="chevron-forward" size={18} color={Colors.gray300} />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+
+        {/* Security Settings */}
+        <Animated.View
+          entering={FadeInDown.delay(350).springify()}
+          style={styles.section}
+        >
+          <Text style={styles.sectionTitle}>Security</Text>
+          <View style={styles.settingsCard}>
+            <TouchableOpacity
+              style={styles.settingsItem}
               onPress={() => setShowPasswordModal(true)}
               activeOpacity={0.6}
+              accessibilityLabel="Change Password"
+              accessibilityRole="button"
             >
-              <Ionicons
-                name="lock-closed-outline"
-                size={22}
-                color={Colors.primary}
-              />
-              <View style={styles.actionContent}>
-                <Text style={styles.actionLabel}>Reset Password</Text>
-                <Text style={styles.actionDescription}>
-                  Change your account password
-                </Text>
+              <View style={[styles.settingsItemIcon, { backgroundColor: Colors.primary + "12" }]}>
+                <Ionicons name="lock-closed-outline" size={20} color={Colors.primary} />
               </View>
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={Colors.gray300}
-              />
+              <View style={styles.settingsItemContent}>
+                <Text style={styles.settingsItemLabel}>Change Password</Text>
+                <Text style={styles.settingsItemDescription}>Update your account password</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={Colors.gray300} />
             </TouchableOpacity>
 
-            <View style={styles.divider} />
+            <View style={styles.settingsDivider} />
 
             <TouchableOpacity
-              style={styles.actionItem}
+              style={styles.settingsItem}
               onPress={handleOpenDevicesModal}
               activeOpacity={0.6}
+              accessibilityLabel={`Manage Devices: ${sessionCount} active ${sessionCount === 1 ? "device" : "devices"}`}
+              accessibilityRole="button"
             >
-              <MaterialCommunityIcons
-                name="devices"
-                size={22}
-                color={Colors.primary}
-              />
-              <View style={styles.actionContent}>
-                <Text style={styles.actionLabel}>Manage Devices</Text>
-                <Text style={styles.actionDescription}>
-                  {sessionCount} active{" "}
-                  {sessionCount === 1 ? "device" : "devices"}
+              <View style={[styles.settingsItemIcon, { backgroundColor: Colors.info + "12" }]}>
+                <MaterialCommunityIcons name="devices" size={20} color={Colors.info} />
+              </View>
+              <View style={styles.settingsItemContent}>
+                <Text style={styles.settingsItemLabel}>Manage Devices</Text>
+                <Text style={styles.settingsItemDescription}>
+                  {sessionCount} active {sessionCount === 1 ? "device" : "devices"}
                 </Text>
               </View>
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={Colors.gray300}
-              />
+              <Ionicons name="chevron-forward" size={18} color={Colors.gray300} />
             </TouchableOpacity>
 
-            <View style={styles.divider} />
+            <View style={styles.settingsDivider} />
 
             <LocalAuthSettings />
+          </View>
+        </Animated.View>
 
-            <View style={styles.divider} />
-
-            <View style={styles.actionItem}>
-              <Ionicons
-                name={expoPushToken ? "notifications" : "notifications-off-outline"}
-                size={22}
-                color={expoPushToken ? Colors.success : Colors.warning}
-              />
-              <View style={styles.actionContent}>
-                <Text style={styles.actionLabel}>Push Notifications</Text>
+        {/* Notifications Settings */}
+        <Animated.View
+          entering={FadeInDown.delay(400).springify()}
+          style={styles.section}
+        >
+          <Text style={styles.sectionTitle}>Notifications</Text>
+          <View style={styles.settingsCard}>
+            <View style={styles.settingsItem}>
+              <View style={[
+                styles.settingsItemIcon,
+                { backgroundColor: expoPushToken ? Colors.success + "12" : Colors.warning + "12" }
+              ]}>
+                <Ionicons
+                  name={expoPushToken ? "notifications" : "notifications-off-outline"}
+                  size={20}
+                  color={expoPushToken ? Colors.success : Colors.warning}
+                />
+              </View>
+              <View style={styles.settingsItemContent}>
+                <Text style={styles.settingsItemLabel}>Push Notifications</Text>
                 <Text style={[
-                  styles.actionDescription,
+                  styles.settingsItemDescription,
                   expoPushToken && styles.successText,
                   !expoPushToken && !isExpoGo && styles.warningText,
                 ]}>
@@ -615,6 +660,9 @@ export default function HRProfileScreen() {
                   onPress={handleEnablePushNotifications}
                   disabled={isRegistering}
                   activeOpacity={0.7}
+                  accessibilityLabel="Enable push notifications"
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: isRegistering }}
                 >
                   {isRegistering ? (
                     <ActivityIndicator size="small" color={Colors.textInverse} />
@@ -628,35 +676,22 @@ export default function HRProfileScreen() {
               )}
             </View>
           </View>
-        </View>
+        </Animated.View>
 
-        <View style={styles.sectionBlock}>
-          <TouchableOpacity
-            style={styles.signOutButton}
-            onPress={handleSignOut}
-            disabled={signOutMutation.isPending}
-            activeOpacity={0.7}
-          >
-            {signOutMutation.isPending ? (
-              <ActivityIndicator size="small" color={Colors.textInverse} />
-            ) : (
-              <>
-                <MaterialCommunityIcons
-                  name="logout"
-                  size={20}
-                  color={Colors.textInverse}
-                />
-                <Text style={styles.signOutButtonText}>Sign Out</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Version 1.0.0</Text>
-          <Text style={styles.footerSubtext}>Salary Book & Attendance App</Text>
-        </View>
+        {/* Footer */}
+        <Animated.View
+          entering={FadeInDown.delay(450).springify()}
+          style={styles.footer}
+        >
+          <Text style={styles.footerText}>Vyapaar Sewa v1.0.0</Text>
+        </Animated.View>
       </ScrollView>
+
+      {/* Floating Action Bar */}
+      <ProfileActionBar
+        onSignOut={handleSignOut}
+        isSigningOut={signOutMutation.isPending}
+      />
 
       {/* Password Reset Modal */}
       <Modal
@@ -675,6 +710,9 @@ export default function HRProfileScreen() {
               <TouchableOpacity
                 onPress={() => setShowPasswordModal(false)}
                 style={styles.modalCloseButton}
+                accessibilityLabel="Close password modal"
+                accessibilityRole="button"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </TouchableOpacity>
@@ -692,10 +730,15 @@ export default function HRProfileScreen() {
                     placeholder="Enter current password"
                     placeholderTextColor={Colors.textTertiary}
                     autoCapitalize="none"
+                    accessibilityLabel="Current password input"
+                    accessibilityHint="Enter your current password"
                   />
                   <TouchableOpacity
                     onPress={() => setShowOldPassword(!showOldPassword)}
                     style={styles.eyeIcon}
+                    accessibilityLabel={showOldPassword ? "Hide current password" : "Show current password"}
+                    accessibilityRole="button"
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
                     <Ionicons
                       name={showOldPassword ? "eye-off-outline" : "eye-outline"}
@@ -717,10 +760,15 @@ export default function HRProfileScreen() {
                     placeholder="Enter new password"
                     placeholderTextColor={Colors.textTertiary}
                     autoCapitalize="none"
+                    accessibilityLabel="New password input"
+                    accessibilityHint="Enter your new password, minimum 6 characters"
                   />
                   <TouchableOpacity
                     onPress={() => setShowNewPassword(!showNewPassword)}
                     style={styles.eyeIcon}
+                    accessibilityLabel={showNewPassword ? "Hide new password" : "Show new password"}
+                    accessibilityRole="button"
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
                     <Ionicons
                       name={showNewPassword ? "eye-off-outline" : "eye-outline"}
@@ -742,15 +790,18 @@ export default function HRProfileScreen() {
                     placeholder="Confirm new password"
                     placeholderTextColor={Colors.textTertiary}
                     autoCapitalize="none"
+                    accessibilityLabel="Confirm new password input"
+                    accessibilityHint="Re-enter your new password to confirm"
                   />
                   <TouchableOpacity
                     onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                     style={styles.eyeIcon}
+                    accessibilityLabel={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                    accessibilityRole="button"
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
                     <Ionicons
-                      name={
-                        showConfirmPassword ? "eye-off-outline" : "eye-outline"
-                      }
+                      name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
                       size={20}
                       color={Colors.textSecondary}
                     />
@@ -763,6 +814,9 @@ export default function HRProfileScreen() {
                   style={styles.cancelButton}
                   onPress={() => setShowPasswordModal(false)}
                   disabled={resetPasswordMutation.isPending}
+                  accessibilityLabel="Cancel"
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: resetPasswordMutation.isPending }}
                 >
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
@@ -771,12 +825,12 @@ export default function HRProfileScreen() {
                   style={styles.resetButton}
                   onPress={handleResetPassword}
                   disabled={resetPasswordMutation.isPending}
+                  accessibilityLabel={resetPasswordMutation.isPending ? "Resetting password" : "Reset Password"}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: resetPasswordMutation.isPending }}
                 >
                   {resetPasswordMutation.isPending ? (
-                    <ActivityIndicator
-                      size="small"
-                      color={Colors.textInverse}
-                    />
+                    <ActivityIndicator size="small" color={Colors.textInverse} />
                   ) : (
                     <Text style={styles.resetButtonText}>Reset Password</Text>
                   )}
@@ -801,6 +855,9 @@ export default function HRProfileScreen() {
               <TouchableOpacity
                 onPress={() => setShowDevicesModal(false)}
                 style={styles.modalCloseButton}
+                accessibilityLabel="Close devices modal"
+                accessibilityRole="button"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Ionicons name="close" size={24} color={Colors.textSecondary} />
               </TouchableOpacity>
@@ -854,11 +911,7 @@ export default function HRProfileScreen() {
                                 : "monitor"
                             }
                             size={28}
-                            color={
-                              session.isCurrent
-                                ? Colors.success
-                                : Colors.primary
-                            }
+                            color={session.isCurrent ? Colors.success : Colors.primary}
                           />
                         </View>
                         <View style={styles.deviceCardContent}>
@@ -868,9 +921,7 @@ export default function HRProfileScreen() {
                             </Text>
                             {session.isCurrent && (
                               <View style={styles.currentDeviceBadge}>
-                                <Text style={styles.currentDeviceText}>
-                                  Current
-                                </Text>
+                                <Text style={styles.currentDeviceText}>Current</Text>
                               </View>
                             )}
                           </View>
@@ -884,21 +935,12 @@ export default function HRProfileScreen() {
 
                       <View style={styles.deviceCardDetails}>
                         <View style={styles.deviceDetailRow}>
-                          <Ionicons
-                            name="time-outline"
-                            size={16}
-                            color={Colors.textSecondary}
-                          />
-                          <Text style={styles.deviceDetailLabel}>
-                            Last Active:
-                          </Text>
+                          <Ionicons name="time-outline" size={16} color={Colors.textSecondary} />
+                          <Text style={styles.deviceDetailLabel}>Last Active:</Text>
                           <Text style={styles.deviceDetailValue}>
                             {session.isCurrent
                               ? "Just now"
-                              : formatDistanceToNow(
-                                  new Date(session.lastActive),
-                                  { addSuffix: true }
-                                )}
+                              : formatDistanceToNow(new Date(session.lastActive), { addSuffix: true })}
                           </Text>
                         </View>
                         {session.osName && session.osVersion && (() => {
@@ -907,14 +949,8 @@ export default function HRProfileScreen() {
 
                           return (
                             <View style={styles.deviceDetailRow}>
-                              <Ionicons
-                                name="phone-portrait-outline"
-                                size={16}
-                                color={Colors.textSecondary}
-                              />
-                              <Text style={styles.deviceDetailLabel}>
-                                OS:
-                              </Text>
+                              <Ionicons name="phone-portrait-outline" size={16} color={Colors.textSecondary} />
+                              <Text style={styles.deviceDetailLabel}>OS:</Text>
                               <View style={styles.osValueContainer}>
                                 <Text style={styles.deviceDetailValue} numberOfLines={isExpanded ? undefined : 1}>
                                   {isExpanded ? osDisplay.full : osDisplay.short}
@@ -924,9 +960,7 @@ export default function HRProfileScreen() {
                                     onPress={() => setExpandedOsSession(isExpanded ? null : session.id)}
                                     activeOpacity={0.7}
                                   >
-                                    <Text style={styles.seeMoreText}>
-                                      {isExpanded ? "less" : "more"}
-                                    </Text>
+                                    <Text style={styles.seeMoreText}>{isExpanded ? "less" : "more"}</Text>
                                   </TouchableOpacity>
                                 )}
                               </View>
@@ -935,56 +969,19 @@ export default function HRProfileScreen() {
                         })()}
                         {session.appVersion && (
                           <View style={styles.deviceDetailRow}>
-                            <Ionicons
-                              name="apps-outline"
-                              size={16}
-                              color={Colors.textSecondary}
-                            />
-                            <Text style={styles.deviceDetailLabel}>
-                              App:
-                            </Text>
-                            <Text style={styles.deviceDetailValue}>
-                              v{session.appVersion}
-                            </Text>
+                            <Ionicons name="apps-outline" size={16} color={Colors.textSecondary} />
+                            <Text style={styles.deviceDetailLabel}>App:</Text>
+                            <Text style={styles.deviceDetailValue}>v{session.appVersion}</Text>
                           </View>
                         )}
                         {session.ipAddress && (
                           <View style={styles.deviceDetailRow}>
-                            <Ionicons
-                              name="location-outline"
-                              size={16}
-                              color={Colors.textSecondary}
-                            />
-                            <Text style={styles.deviceDetailLabel}>
-                              IP Address:
-                            </Text>
-                            <Text style={styles.deviceDetailValue}>
-                              {session.ipAddress}
-                            </Text>
+                            <Ionicons name="location-outline" size={16} color={Colors.textSecondary} />
+                            <Text style={styles.deviceDetailLabel}>IP Address:</Text>
+                            <Text style={styles.deviceDetailValue}>{session.ipAddress}</Text>
                           </View>
                         )}
                       </View>
-
-                      {/* Remove device button - commented out for now
-                      <TouchableOpacity
-                        style={[
-                          styles.removeDeviceButton,
-                          revokeSessionMutation.isPending && styles.removeDeviceButtonDisabled
-                        ]}
-                        onPress={() => handleRevokeSession(session.id, session.deviceName, session.isCurrent)}
-                        disabled={revokeSessionMutation.isPending}
-                        activeOpacity={0.7}
-                      >
-                        <MaterialCommunityIcons 
-                          name={session.isCurrent ? 'logout' : 'close-circle-outline'} 
-                          size={18} 
-                          color={Colors.error} 
-                        />
-                        <Text style={styles.removeDeviceButtonText}>
-                          {session.isCurrent ? 'Sign Out' : 'Remove Device'}
-                        </Text>
-                      </TouchableOpacity>
-                      */}
                     </View>
                   ))}
 
@@ -994,22 +991,17 @@ export default function HRProfileScreen() {
                       onPress={handleSignOutAllDevices}
                       disabled={signOutAllDevicesMutation.isPending}
                       activeOpacity={0.7}
+                      accessibilityLabel="Sign out from all devices"
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled: signOutAllDevicesMutation.isPending }}
+                      accessibilityHint="This will sign you out from all devices including this one"
                     >
                       {signOutAllDevicesMutation.isPending ? (
-                        <ActivityIndicator
-                          size="small"
-                          color={Colors.textInverse}
-                        />
+                        <ActivityIndicator size="small" color={Colors.textInverse} />
                       ) : (
                         <>
-                          <MaterialCommunityIcons
-                            name="logout-variant"
-                            size={18}
-                            color={Colors.textInverse}
-                          />
-                          <Text style={styles.signOutAllButtonText}>
-                            Sign Out All
-                          </Text>
+                          <MaterialCommunityIcons name="logout-variant" size={18} color={Colors.textInverse} />
+                          <Text style={styles.signOutAllButtonText}>Sign Out All</Text>
                         </>
                       )}
                     </TouchableOpacity>
@@ -1033,218 +1025,152 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingTop: 0,
-    paddingBottom: 120,
-    paddingHorizontal: Spacing["2xl"],
-    gap: Spacing["lg"],
+    paddingBottom: 160,
   },
-  heroSection: {
-    marginHorizontal: -Spacing["2xl"],
-    borderBottomLeftRadius: BorderRadius["3xl"],
-    borderBottomRightRadius: BorderRadius["3xl"],
+
+  // Bento Stats - Float over hero
+  bentoStatsContainer: {
+    paddingHorizontal: Spacing.lg,
+    marginTop: -Spacing["2xl"],
   },
-  heroContent: {
-    paddingHorizontal: Spacing["2xl"],
-    paddingTop: Spacing["xl"],
-    paddingBottom: Spacing["2xl"],
-    gap: Spacing["lg"],
-  },
-  heroHeaderRow: {
+  bentoStatsCard: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: Spacing["xl"],
-  },
-  heroTextBlock: {
-    flex: 1,
-    gap: Spacing["xs"],
-  },
-  heroGreeting: {
-    fontSize: Typography.fontSize["2xl"],
-    fontWeight: Typography.fontWeight.bold,
-    color: Colors.textInverse,
-    letterSpacing: -0.5,
-  },
-  heroEmail: {
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.medium,
-    color: Colors.textInverse,
-    opacity: 0.85,
-  },
-  avatarButton: {
-    width: 52,
-    height: 52,
+    backgroundColor: "#FFFFFF",
     borderRadius: BorderRadius["2xl"],
+    padding: Spacing.md,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.35)",
-    backgroundColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(0,0,0,0.04)",
+    ...Shadows.md,
+  },
+  bentoStatItem: {
+    flex: 1,
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 2,
+  },
+  bentoStatIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
   },
-  avatarLetter: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
-    color: Colors.textInverse,
+  bentoStatValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: Colors.text,
+    letterSpacing: -0.3,
+    textAlign: "center",
   },
-  heroMetricsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing["md"],
-    marginTop: Spacing["sm"],
+  bentoStatValueSmall: {
+    fontSize: 12,
+    lineHeight: 16,
   },
-  heroMetricCard: {
-    flex: 1,
-    minWidth: 160,
-    flexBasis: "48%",
-    borderRadius: BorderRadius["2xl"],
-    paddingVertical: Spacing["md"],
-    paddingHorizontal: Spacing["md"],
-    gap: Spacing["sm"],
-    flexDirection: "row",
-    alignItems: "center",
-    minHeight: 80,
-    overflow: "hidden",
+  bentoStatLabel: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: Colors.textSecondary,
   },
-  heroMetricPrimary: {
-    backgroundColor: "rgba(255,255,255,0.12)",
+  bentoStatDivider: {
+    width: 1,
+    backgroundColor: Colors.gray100,
+    marginVertical: 4,
   },
-  heroMetricSecondary: {
-    backgroundColor: "rgba(255,255,255,0.10)",
-  },
-  heroMetricTertiary: {
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-  heroMetricIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: BorderRadius["2xl"],
-    justifyContent: "center",
-    alignItems: "center",
-    flexShrink: 0,
-  },
-  heroMetricIconOverlay: {
-    backgroundColor: "rgba(255,255,255,0.18)",
-  },
-  heroMetricContent: {
-    flex: 1,
-    gap: Spacing["xs"],
-    overflow: "hidden",
-  },
-  heroMetricLabel: {
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.textInverse,
-    opacity: 0.72,
-    letterSpacing: 0.7,
-    textTransform: "uppercase",
-  },
-  heroMetricValue: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.bold,
-    color: Colors.textInverse,
-  },
-  roleBadgeContainer: {
-    alignItems: "center",
-    marginTop: Spacing["xs"],
-  },
-  sectionBlock: {
-    gap: Spacing["md"],
-  },
-  sectionBlockFirst: {
-    marginTop: 0,
+
+  // Sections
+  section: {
+    paddingHorizontal: Spacing.lg,
+    marginTop: Spacing.xl,
   },
   sectionTitle: {
-    fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: "700",
     color: Colors.text,
+    marginBottom: Spacing.md,
+    letterSpacing: -0.3,
   },
-  groupedList: {
-    backgroundColor: Colors.backgroundSecondary,
+
+  // Settings Cards
+  settingsCard: {
+    backgroundColor: "#FFFFFF",
     borderRadius: BorderRadius.xl,
     overflow: "hidden",
-    width: "100%",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.04)",
+    ...Shadows.sm,
   },
-  listItem: {
+  settingsItem: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: Spacing["md"],
-    paddingHorizontal: Spacing["lg"],
-    minHeight: 48,
-    backgroundColor: Colors.backgroundSecondary,
-    gap: Spacing["md"],
-    width: "100%",
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    gap: Spacing.md,
+    minHeight: 64,
   },
-  listLabel: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.text,
-    flexShrink: 0,
+  settingsItemIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadius.lg,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  listValue: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.medium,
-    color: Colors.textSecondary,
-    textAlign: "right",
+  settingsItemContent: {
     flex: 1,
-    flexShrink: 1,
-    minWidth: 0,
+    gap: 2,
   },
-  divider: {
+  settingsItemLabel: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: "600",
+    color: Colors.text,
+  },
+  settingsItemDescription: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: "500",
+    color: Colors.textSecondary,
+  },
+  settingsDivider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: Colors.border,
-    marginLeft: Spacing["lg"],
+    marginLeft: Spacing.lg + 40 + Spacing.md,
   },
-  actionItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: Spacing["md"],
-    paddingHorizontal: Spacing["lg"],
-    gap: Spacing["md"],
-    minHeight: 56,
-  },
-  actionContent: {
-    flex: 1,
-    gap: Spacing["xs"],
-  },
-  actionLabel: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.text,
-  },
-  actionDescription: {
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.medium,
-    color: Colors.textSecondary,
-  },
-  signOutButton: {
-    backgroundColor: Colors.error,
-    flexDirection: "row",
-    paddingVertical: Spacing["md"],
-    borderRadius: BorderRadius.lg,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing["sm"],
-  },
-  signOutButtonText: {
-    color: Colors.textInverse,
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.bold,
-  },
+
+  // Footer
   footer: {
-    paddingVertical: Spacing["xl"],
+    paddingVertical: Spacing.xl,
     alignItems: "center",
-    gap: Spacing["xs"],
+    marginTop: Spacing.lg,
   },
   footerText: {
     fontSize: Typography.fontSize.sm,
-    color: Colors.textSecondary,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  footerSubtext: {
-    fontSize: Typography.fontSize.xs,
     color: Colors.textTertiary,
+    fontWeight: "500",
   },
+
+  // Status text colors
+  successText: {
+    color: Colors.success,
+  },
+  warningText: {
+    color: Colors.warning,
+  },
+
+  // Enable button
+  enableButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    minWidth: 70,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  enableButtonText: {
+    color: Colors.textInverse,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: "600",
+  },
+
+  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -1261,33 +1187,33 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: Spacing["xl"],
+    padding: Spacing.xl,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
   modalTitle: {
     fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold,
+    fontWeight: "700",
     color: Colors.text,
   },
   modalCloseButton: {
-    padding: Spacing["xs"],
+    padding: Spacing.xs,
   },
   modalBody: {
-    paddingHorizontal: Spacing["xl"],
+    paddingHorizontal: Spacing.xl,
   },
   modalScrollContent: {
-    paddingTop: Spacing["xl"],
+    paddingTop: Spacing.xl,
     paddingBottom: Spacing["3xl"],
   },
   inputGroup: {
-    marginBottom: Spacing["lg"],
+    marginBottom: Spacing.lg,
   },
   inputLabel: {
     fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
+    fontWeight: "600",
     color: Colors.text,
-    marginBottom: Spacing["sm"],
+    marginBottom: Spacing.sm,
   },
   passwordInputContainer: {
     flexDirection: "row",
@@ -1299,54 +1225,56 @@ const styles = StyleSheet.create({
   },
   passwordInput: {
     flex: 1,
-    paddingVertical: Spacing["md"],
-    paddingHorizontal: Spacing["lg"],
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     fontSize: Typography.fontSize.base,
     color: Colors.text,
   },
   eyeIcon: {
-    padding: Spacing["md"],
+    padding: Spacing.md,
   },
   modalActions: {
     flexDirection: "row",
-    gap: Spacing["md"],
-    marginTop: Spacing["md"],
+    gap: Spacing.md,
+    marginTop: Spacing.md,
   },
   cancelButton: {
     flex: 1,
     backgroundColor: Colors.gray200,
-    paddingVertical: Spacing["md"],
+    paddingVertical: Spacing.md,
     borderRadius: BorderRadius.xl,
     alignItems: "center",
   },
   cancelButtonText: {
     fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold,
+    fontWeight: "600",
     color: Colors.textSecondary,
   },
   resetButton: {
     flex: 1,
     backgroundColor: Colors.primary,
-    paddingVertical: Spacing["md"],
+    paddingVertical: Spacing.md,
     borderRadius: BorderRadius.xl,
     alignItems: "center",
   },
   resetButtonText: {
     fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold,
+    fontWeight: "600",
     color: Colors.textInverse,
   },
+
+  // Device Modal styles
   deviceInfoCard: {
     backgroundColor: "#EFF6FF",
     borderRadius: BorderRadius.xl,
-    padding: Spacing["md"],
-    marginBottom: Spacing["lg"],
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
     borderWidth: 1,
     borderColor: "#DBEAFE",
   },
   deviceInfoHeader: {
     flexDirection: "row",
-    gap: Spacing["sm"],
+    gap: Spacing.sm,
     alignItems: "flex-start",
   },
   deviceInfoText: {
@@ -1358,15 +1286,15 @@ const styles = StyleSheet.create({
   deviceCard: {
     backgroundColor: Colors.backgroundSecondary,
     borderRadius: BorderRadius.xl,
-    padding: Spacing["lg"],
-    marginBottom: Spacing["md"],
+    padding: Spacing.lg,
+    marginBottom: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   deviceCardHeader: {
     flexDirection: "row",
-    gap: Spacing["md"],
-    marginBottom: Spacing["md"],
+    gap: Spacing.md,
+    marginBottom: Spacing.md,
   },
   deviceIconContainer: {
     width: 48,
@@ -1378,7 +1306,7 @@ const styles = StyleSheet.create({
   },
   deviceCardContent: {
     flex: 1,
-    gap: Spacing["xs"],
+    gap: Spacing.xs,
   },
   deviceCardTitleRow: {
     flexDirection: "row",
@@ -1387,7 +1315,7 @@ const styles = StyleSheet.create({
   },
   deviceName: {
     fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
+    fontWeight: "700",
     color: Colors.text,
   },
   deviceType: {
@@ -1396,35 +1324,35 @@ const styles = StyleSheet.create({
   },
   currentDeviceBadge: {
     backgroundColor: Colors.success,
-    paddingHorizontal: Spacing["sm"],
-    paddingVertical: Spacing["xs"],
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.md,
   },
   currentDeviceText: {
     fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.bold,
+    fontWeight: "700",
     color: Colors.textInverse,
     textTransform: "uppercase",
   },
   deviceCardDetails: {
-    gap: Spacing["sm"],
-    paddingTop: Spacing["sm"],
+    gap: Spacing.sm,
+    paddingTop: Spacing.sm,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },
   deviceDetailRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing["xs"],
+    gap: Spacing.xs,
   },
   deviceDetailLabel: {
     fontSize: Typography.fontSize.sm,
     color: Colors.textSecondary,
-    marginLeft: Spacing["xs"],
+    marginLeft: Spacing.xs,
   },
   deviceDetailValue: {
     fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
+    fontWeight: "600",
     color: Colors.text,
     marginLeft: "auto",
   },
@@ -1433,35 +1361,35 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
-    gap: Spacing["xs"],
+    gap: Spacing.xs,
     flexWrap: "wrap",
   },
   seeMoreText: {
     fontSize: Typography.fontSize.xs,
     color: Colors.primary,
-    fontWeight: Typography.fontWeight.medium,
+    fontWeight: "500",
   },
   signOutAllButton: {
     backgroundColor: Colors.error,
     flexDirection: "row",
-    paddingVertical: Spacing["md"],
-    paddingHorizontal: Spacing["lg"],
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
     borderRadius: BorderRadius.xl,
     alignItems: "center",
     justifyContent: "center",
-    gap: Spacing["sm"],
-    marginTop: Spacing["md"],
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
   },
   signOutAllButtonText: {
     color: Colors.textInverse,
     fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.bold,
+    fontWeight: "700",
   },
   loadingContainer: {
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: Spacing["4xl"],
-    gap: Spacing["md"],
+    gap: Spacing.md,
   },
   loadingText: {
     fontSize: Typography.fontSize.base,
@@ -1471,52 +1399,50 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: Spacing["4xl"],
-    gap: Spacing["md"],
+    gap: Spacing.md,
   },
   emptyStateText: {
     fontSize: Typography.fontSize.base,
     color: Colors.textSecondary,
-    fontWeight: Typography.fontWeight.medium,
+    fontWeight: "500",
   },
-  removeDeviceButton: {
+
+  // Badge styles
+  badge: {
+    backgroundColor: Colors.primary,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: Spacing.xs,
+    marginRight: Spacing.xs,
+  },
+  badgeText: {
+    fontSize: Typography.fontSize.xs,
+    fontWeight: "700",
+    color: Colors.textInverse,
+  },
+
+  // Employer code styles
+  employerCodeValue: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: "700",
+    color: Colors.primary,
+    letterSpacing: 2,
+  },
+  copyButton: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing["xs"],
-    paddingVertical: Spacing["sm"],
-    paddingHorizontal: Spacing["md"],
-    marginTop: Spacing["md"],
+    gap: Spacing.xs,
+    backgroundColor: Colors.primary + "15",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: Colors.error,
-    backgroundColor: Colors.background,
   },
-  removeDeviceButtonDisabled: {
-    opacity: 0.5,
-  },
-  removeDeviceButtonText: {
+  copyButtonText: {
     fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.error,
-  },
-  successText: {
-    color: Colors.success,
-  },
-  warningText: {
-    color: Colors.warning,
-  },
-  enableButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing["md"],
-    paddingVertical: Spacing["sm"],
-    borderRadius: BorderRadius.lg,
-    minWidth: 70,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  enableButtonText: {
-    color: Colors.textInverse,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
+    fontWeight: "600",
+    color: Colors.primary,
   },
 });

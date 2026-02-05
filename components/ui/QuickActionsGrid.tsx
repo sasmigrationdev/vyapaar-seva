@@ -1,9 +1,9 @@
 import { Text } from "@/components/ui/Text";
-import { Colors, BorderRadius, Spacing, Shadows, Gradients, AnimationPresets } from "@/constants/theme";
+import { AnimationPresets, BorderRadius, Colors, Gradients, Shadows, Spacing } from "@/constants/theme";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { StyleSheet, View, TouchableOpacity, Animated } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRef } from "react";
+import { Animated, StyleSheet, TouchableOpacity, View } from "react-native";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
@@ -24,12 +24,14 @@ interface QuickActionsGridProps {
   columns?: 2 | 3 | 4;
 }
 
-function ActionCard({ action, isWide }: { action: QuickAction; isWide?: boolean }) {
+function ActionCard({ action, columns = 2 }: { action: QuickAction; columns?: 2 | 3 | 4 }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
-      toValue: AnimationPresets.pressScale,
+      toValue: 0.94,
+      tension: 120,
+      friction: 10,
       useNativeDriver: true,
     }).start();
   };
@@ -37,21 +39,26 @@ function ActionCard({ action, isWide }: { action: QuickAction; isWide?: boolean 
   const handlePressOut = () => {
     Animated.spring(scaleAnim, {
       toValue: 1,
+      tension: 80,
+      friction: 8,
       useNativeDriver: true,
     }).start();
   };
 
   return (
-    <Animated.View style={[styles.actionCardWrapper, isWide && styles.actionCardWide, { transform: [{ scale: scaleAnim }] }]}>
+    <Animated.View style={[styles.actionCardWrapper, { transform: [{ scale: scaleAnim }] }]}>
       <TouchableOpacity
         style={styles.actionCard}
         onPress={action.onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={1}
+        accessibilityLabel={action.description ? `${action.label}: ${action.description}` : action.label}
+        accessibilityRole="button"
+        accessibilityHint={`Navigate to ${action.label}`}
       >
         <View style={[styles.iconWrapper, { backgroundColor: action.color + "15" }]}>
-          <MaterialCommunityIcons name={action.icon} size={24} color={action.color} />
+          <MaterialCommunityIcons name={action.icon} size={26} color={action.color} />
           {action.badge !== undefined && action.badge > 0 && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>
@@ -63,11 +70,6 @@ function ActionCard({ action, isWide }: { action: QuickAction; isWide?: boolean 
         <Text style={styles.actionLabel} numberOfLines={1}>
           {action.label}
         </Text>
-        {action.description && (
-          <Text style={styles.actionDescription} numberOfLines={1}>
-            {action.description}
-          </Text>
-        )}
       </TouchableOpacity>
     </Animated.View>
   );
@@ -100,6 +102,9 @@ function GradientActionCard({ action }: { action: QuickAction }) {
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={1}
+        accessibilityLabel={action.label}
+        accessibilityRole="button"
+        accessibilityHint={`Navigate to ${action.label}`}
       >
         <LinearGradient
           colors={gradientColors}
@@ -138,7 +143,7 @@ export default function QuickActionsGrid({
 
   return (
     <View style={styles.container}>
-      {title && <Text style={styles.sectionTitle}>{title}</Text>}
+      {/* {title && <Text style={styles.sectionTitle}>{title}</Text>} */}
 
       <View style={styles.grid}>
         {rows.map((row, rowIndex) => (
@@ -147,7 +152,7 @@ export default function QuickActionsGrid({
               <ActionCard
                 key={action.id}
                 action={action}
-                isWide={columns === 2}
+                columns={columns}
               />
             ))}
             {/* Fill empty spaces in last row */}
@@ -198,61 +203,50 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: Colors.text,
+    color: "#1A1A1A",
     letterSpacing: -0.3,
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: 22,
   },
   grid: {
     paddingHorizontal: Spacing.lg,
-    gap: Spacing.sm,
+    gap: Spacing.xs,
   },
   row: {
     flexDirection: "row",
-    gap: Spacing.sm,
+    gap: Spacing.xs,
   },
   actionCardWrapper: {
     flex: 1,
   },
-  actionCardWide: {
-    minHeight: 100,
-  },
   actionCard: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.md,
     alignItems: "center",
-    justifyContent: "center",
+    paddingVertical: Spacing.sm,
     gap: Spacing.sm,
-    borderWidth: 1,
-    borderColor: "rgba(0, 0, 0, 0.04)",
-    ...Shadows.sm,
   },
   emptyCard: {
     backgroundColor: "transparent",
-    borderWidth: 0,
   },
   iconWrapper: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.lg,
+    width: 56,
+    height: 56,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
     position: "relative",
   },
   badge: {
     position: "absolute",
-    top: -6,
-    right: -6,
+    top: -4,
+    right: -4,
     backgroundColor: Colors.error,
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 4,
     borderWidth: 2,
-    borderColor: "#FFFFFF",
+    borderColor: "#FAFAFA",
   },
   badgeText: {
     fontSize: 10,
@@ -260,16 +254,11 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   actionLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "600",
-    color: Colors.text,
+    color: "#1A1A1A",
     textAlign: "center",
-  },
-  actionDescription: {
-    fontSize: 11,
-    fontWeight: "500",
-    color: Colors.textSecondary,
-    textAlign: "center",
+    letterSpacing: -0.2,
   },
   gradientCardWrapper: {
     marginHorizontal: Spacing.lg,
