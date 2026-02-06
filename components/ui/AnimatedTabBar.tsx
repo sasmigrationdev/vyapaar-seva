@@ -11,7 +11,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const SPRING_CONFIG = {
   damping: 15,
@@ -101,8 +100,8 @@ function TabItem({ label, isFocused, onPress, onLongPress, icon, isDark }: TabIt
 
 export default function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  // Force light theme to match iOS appearance
+  const isDark = false;
 
   // Filter to only visible tabs (those with tabBarIcon defined)
   const visibleRoutes = state.routes.filter((route) => {

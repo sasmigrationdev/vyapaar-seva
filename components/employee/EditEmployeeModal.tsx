@@ -26,6 +26,7 @@ import {
   calculateMonthlyTotalHours,
   calculateHourlyRate,
 } from '@/lib/utils/workingDays.utils';
+import { FontFamily } from '@/constants/theme';
 
 interface EditEmployeeModalProps {
   visible: boolean;
@@ -630,6 +631,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 15,
+    fontFamily: FontFamily.regular,
     color: '#0F172A',
   },
   textAreaWrapper: {
@@ -746,11 +748,15 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginTop: 8,
     gap: 8,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+    }),
   },
   submitButtonDisabled: {
     opacity: 0.6,

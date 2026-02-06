@@ -16,7 +16,7 @@ import DatePicker from '@/components/ui/DatePicker';
 import { useUpdateProfile } from '@/hooks/mutations/useUserMutations';
 import { useAlert } from '@/hooks/useAlert';
 import { User } from '@/lib/types';
-import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, FontFamily } from '@/constants/theme';
 
 interface EditPersonalInfoModalProps {
   visible: boolean;
@@ -319,6 +319,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: Typography.fontSize.base,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
     paddingVertical: 0,
   },

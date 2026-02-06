@@ -11,6 +11,7 @@ import {
 import { Text } from '@/components/ui/Text';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { FinancialCategory } from '@/lib/types/financial.types';
+import { FontFamily } from '@/constants/theme';
 
 interface CategoryModalProps {
   visible: boolean;
@@ -278,6 +279,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 14,
     fontSize: 15,
+    fontFamily: FontFamily.regular,
     color: '#0F172A',
     backgroundColor: '#F8FAFC',
   },

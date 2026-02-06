@@ -1,6 +1,7 @@
 import { View, TextInput, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Text } from '@/components/ui/Text';
+import { FontFamily } from '@/constants/theme';
 
 interface BankAccountFormProps {
   bankName: string;
@@ -150,6 +151,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 15,
+    fontFamily: FontFamily.regular,
     color: '#0F172A',
   },
   helperText: {

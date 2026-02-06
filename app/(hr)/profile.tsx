@@ -1,5 +1,5 @@
 import { Text } from "@/components/ui/Text";
-import { BorderRadius, Colors, Shadows, Spacing, Typography } from "@/constants/theme";
+import { BorderRadius, Colors, Shadows, Spacing, Typography, FontFamily } from "@/constants/theme";
 import { useAuth } from "@/hooks/auth/useAuth";
 import { useSignOut } from "@/hooks/mutations/useAuthMutations";
 import {
@@ -1228,6 +1228,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
     fontSize: Typography.fontSize.base,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
   },
   eyeIcon: {

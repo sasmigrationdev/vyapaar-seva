@@ -26,6 +26,7 @@ import {
   Spacing,
   StatusColors,
   Typography,
+  FontFamily,
 } from '@/constants/theme';
 
 interface AddOvertimeModalProps {
@@ -774,8 +775,8 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: Typography.fontSize.base,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
-    fontWeight: Typography.fontWeight.regular,
   },
   textAreaWrapper: {
     alignItems: 'flex-start',
@@ -816,11 +817,15 @@ const styles = StyleSheet.create({
   },
   submitFooterButton: {
     backgroundColor: Colors.purple,
-    shadowColor: Colors.purple,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: Colors.purple,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+    }),
   },
   submitFooterButtonDisabled: {
     opacity: 0.5,

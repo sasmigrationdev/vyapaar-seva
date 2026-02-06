@@ -1,27 +1,162 @@
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useAlert } from '@/hooks/useAlert';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/ui/Text';
 import { useState, useEffect, useMemo } from 'react';
+import Animated, {
+  FadeInRight,
+  FadeIn,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  Layout,
+} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { getAvailableMonths, downloadSalarySlip } from '@/lib/utils/salarySlip.utils';
 import { formatCurrency } from '@/lib/utils/salary.utils';
 import { usePayslipDownloads } from '@/hooks/queries/usePayslipDownloads';
 import { useRecordPayslipDownload } from '@/hooks/mutations/usePayslipDownloadMutations';
+import { Colors, Spacing, BorderRadius, Typography, Shadows } from '@/constants/theme';
 
 interface MonthlySlipsListProps {
   userId: string;
 }
 
+interface MonthData {
+  month: number;
+  year: number;
+  totalHours: number;
+  earnedSalary: number;
+}
+
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
+const SlipCard = ({
+  monthData,
+  index,
+  isDownloaded,
+  downloadedAt,
+  isDownloading,
+  onDownload,
+}: {
+  monthData: MonthData;
+  index: number;
+  isDownloaded: boolean;
+  downloadedAt?: string;
+  isDownloading: boolean;
+  onDownload: () => void;
+}) => {
+  const scale = useSharedValue(1);
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.98, { damping: 15 });
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, { damping: 12 });
+  };
+
+  const cardStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const getMonthName = (month: number) => {
+    const date = new Date(2000, month - 1, 1);
+    return date.toLocaleDateString('en-US', { month: 'long' });
+  };
+
+  const formatDownloadDate = (isoDate: string) => {
+    const date = new Date(isoDate);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  const handleDownloadPress = () => {
+    if (!isDownloaded && !isDownloading) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      onDownload();
+    }
+  };
+
+  return (
+    <Animated.View
+      entering={FadeInRight.delay(index * 80).springify()}
+      layout={Layout.springify()}
+      style={[styles.monthCard, cardStyle]}
+    >
+      <TouchableOpacity
+        style={styles.cardTouchable}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={1}
+        disabled={isDownloaded}
+        onPress={handleDownloadPress}
+      >
+        <View style={styles.monthInfo}>
+          <View style={[styles.iconWrapper, isDownloaded && styles.iconWrapperDownloaded]}>
+            <MaterialCommunityIcons
+              name={isDownloaded ? 'check-circle' : 'file-document'}
+              size={24}
+              color={isDownloaded ? Colors.success : Colors.indigo}
+            />
+          </View>
+          <View style={styles.monthDetails}>
+            <Text style={styles.monthTitle}>
+              {getMonthName(monthData.month)} {monthData.year}
+            </Text>
+            <View style={styles.monthStatsRow}>
+              <View style={styles.statChip}>
+                <Ionicons name="time-outline" size={12} color={Colors.textSecondary} />
+                <Text style={styles.monthStatText}>
+                  {monthData.totalHours.toFixed(1)} hrs
+                </Text>
+              </View>
+              <View style={styles.statChip}>
+                <MaterialCommunityIcons name="currency-inr" size={12} color={Colors.textSecondary} />
+                <Text style={styles.monthStatText}>
+                  {formatCurrency(monthData.earnedSalary)}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {isDownloaded ? (
+          <View style={styles.downloadedBadge}>
+            <MaterialCommunityIcons name="check" size={16} color={Colors.success} />
+            <View style={styles.downloadedTextContainer}>
+              <Text style={styles.downloadedText}>Downloaded</Text>
+              {downloadedAt && (
+                <Text style={styles.downloadedDate}>
+                  {formatDownloadDate(downloadedAt)}
+                </Text>
+              )}
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[styles.downloadButton, isDownloading && styles.downloadButtonDisabled]}
+            onPress={handleDownloadPress}
+            disabled={isDownloading}
+            activeOpacity={0.7}
+          >
+            {isDownloading ? (
+              <ActivityIndicator size="small" color={Colors.indigo} />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="download" size={18} color={Colors.indigo} />
+                <Text style={styles.downloadButtonText}>Download</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
 export default function MonthlySlipsList({ userId }: MonthlySlipsListProps) {
   const { success, error } = useAlert();
-  const [months, setMonths] = useState<
-    Array<{
-      month: number;
-      year: number;
-      totalHours: number;
-      earnedSalary: number;
-    }>
-  >([]);
+  const [months, setMonths] = useState<MonthData[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingMonth, setDownloadingMonth] = useState<string | null>(null);
 
@@ -67,7 +202,7 @@ export default function MonthlySlipsList({ userId }: MonthlySlipsListProps) {
     // Show confirmation alert
     Alert.alert(
       'Download Payslip',
-      'Once downloaded, you won\'t be able to download this payslip again. Continue?',
+      "Once downloaded, you won't be able to download this payslip again. Continue?",
       [
         {
           text: 'Cancel',
@@ -85,6 +220,7 @@ export default function MonthlySlipsList({ userId }: MonthlySlipsListProps) {
   const executeDownload = async (month: number, year: number, key: string) => {
     try {
       setDownloadingMonth(key);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       // First, attempt to download the PDF
       await downloadSalarySlip(userId, month, year);
@@ -92,29 +228,21 @@ export default function MonthlySlipsList({ userId }: MonthlySlipsListProps) {
       // Only record the download AFTER successful PDF generation
       await recordDownload.mutateAsync({ month, year });
 
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       success('Success', 'Salary slip downloaded successfully');
     } catch (err) {
       console.error('Error downloading salary slip:', err);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       error('Error', 'Failed to download salary slip. Please try again.');
     } finally {
       setDownloadingMonth(null);
     }
   };
 
-  const getMonthName = (month: number) => {
-    const date = new Date(2000, month - 1, 1);
-    return date.toLocaleDateString('en-US', { month: 'long' });
-  };
-
-  const formatDownloadDate = (isoDate: string) => {
-    const date = new Date(isoDate);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color="#6366F1" />
+        <ActivityIndicator size="small" color={Colors.indigo} />
         <Text style={styles.loadingText}>Loading salary slips...</Text>
       </View>
     );
@@ -122,187 +250,177 @@ export default function MonthlySlipsList({ userId }: MonthlySlipsListProps) {
 
   if (months.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
-        <MaterialCommunityIcons name="file-document-outline" size={48} color="#CBD5E1" />
+      <Animated.View entering={FadeIn.duration(300)} style={styles.emptyContainer}>
+        <View style={styles.emptyIconContainer}>
+          <MaterialCommunityIcons name="file-document-outline" size={48} color={Colors.gray300} />
+        </View>
         <Text style={styles.emptyText}>No salary slips available</Text>
         <Text style={styles.emptySubtext}>
           Salary slips will appear here once attendance and earnings are recorded
         </Text>
-      </View>
+      </Animated.View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {months.map((monthData) => {
+      {months.map((monthData, index) => {
         const key = `${monthData.year}-${monthData.month}`;
         const isDownloading = downloadingMonth === key;
         const downloadInfo = downloadedMap.get(key);
         const isDownloaded = !!downloadInfo;
 
         return (
-          <View key={key} style={styles.monthCard}>
-            <View style={styles.monthInfo}>
-              <View style={[styles.iconWrapper, isDownloaded && styles.iconWrapperDownloaded]}>
-                <MaterialCommunityIcons
-                  name={isDownloaded ? 'check-circle' : 'file-document'}
-                  size={24}
-                  color={isDownloaded ? '#10B981' : '#6366F1'}
-                />
-              </View>
-              <View style={styles.monthDetails}>
-                <Text style={styles.monthTitle}>
-                  {getMonthName(monthData.month)} {monthData.year}
-                </Text>
-                <Text style={styles.monthStats}>
-                  {monthData.totalHours.toFixed(1)} hrs • {formatCurrency(monthData.earnedSalary)}
-                </Text>
-              </View>
-            </View>
-
-            {isDownloaded ? (
-              <View style={styles.downloadedBadge}>
-                <MaterialCommunityIcons name="check" size={16} color="#10B981" />
-                <View style={styles.downloadedTextContainer}>
-                  <Text style={styles.downloadedText}>Downloaded</Text>
-                  <Text style={styles.downloadedDate}>
-                    {formatDownloadDate(downloadInfo.downloadedAt)}
-                  </Text>
-                </View>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={[styles.downloadButton, isDownloading && styles.downloadButtonDisabled]}
-                onPress={() => handleDownload(monthData.month, monthData.year)}
-                disabled={isDownloading}
-                activeOpacity={0.7}
-              >
-                {isDownloading ? (
-                  <ActivityIndicator size="small" color="#6366F1" />
-                ) : (
-                  <>
-                    <MaterialCommunityIcons name="download" size={20} color="#6366F1" />
-                    <Text style={styles.downloadButtonText}>Download</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            )}
-          </View>
+          <SlipCard
+            key={key}
+            monthData={monthData}
+            index={index}
+            isDownloaded={isDownloaded}
+            downloadedAt={downloadInfo?.downloadedAt}
+            isDownloading={isDownloading}
+            onDownload={() => handleDownload(monthData.month, monthData.year)}
+          />
         );
       })}
     </View>
   );
 }
 
+// Export for use in trend chart
+export type { MonthData };
+
 const styles = StyleSheet.create({
   container: {
-    gap: 12,
+    gap: Spacing.md,
   },
   loadingContainer: {
-    padding: 32,
+    padding: Spacing['2xl'],
     alignItems: 'center',
-    gap: 12,
+    gap: Spacing.md,
   },
   loadingText: {
-    fontSize: 14,
-    color: '#64748B',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
   },
   emptyContainer: {
-    padding: 32,
+    padding: Spacing['2xl'],
     alignItems: 'center',
-    gap: 12,
+    gap: Spacing.md,
+  },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.gray100,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
   },
   emptyText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#64748B',
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.textSecondary,
     textAlign: 'center',
   },
   emptySubtext: {
-    fontSize: 13,
-    color: '#94A3B8',
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textTertiary,
     textAlign: 'center',
+    lineHeight: 20,
   },
   monthCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: Colors.background,
+    borderRadius: BorderRadius.xl,
+    ...Shadows.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  cardTouchable: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    padding: Spacing.lg,
   },
   monthInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: Spacing.md,
     flex: 1,
   },
   iconWrapper: {
     width: 48,
     height: 48,
-    borderRadius: 12,
-    backgroundColor: '#EEF2FF',
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.indigoLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
   iconWrapperDownloaded: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: Colors.success + '15',
   },
   monthDetails: {
     flex: 1,
   },
   monthTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0F172A',
-    marginBottom: 4,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.text,
+    marginBottom: Spacing.xs,
   },
-  monthStats: {
-    fontSize: 13,
-    color: '#64748B',
+  monthStatsRow: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  statChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  monthStatText: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textSecondary,
+    fontWeight: '500',
   },
   downloadButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#EEF2FF',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    gap: Spacing.xs,
+    backgroundColor: Colors.indigoLight,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    minWidth: 100,
+    justifyContent: 'center',
   },
   downloadButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.6,
   },
   downloadButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6366F1',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.indigo,
   },
   downloadedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#ECFDF5',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    gap: Spacing.xs,
+    backgroundColor: Colors.success + '15',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.lg,
   },
   downloadedTextContainer: {
     alignItems: 'flex-start',
   },
   downloadedText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#10B981',
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.success,
   },
   downloadedDate: {
     fontSize: 10,
-    color: '#6EE7B7',
+    color: Colors.success,
+    opacity: 0.8,
     marginTop: 1,
   },
 });

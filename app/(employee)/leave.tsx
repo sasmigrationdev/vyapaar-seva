@@ -10,7 +10,7 @@ import { useLeaveRequests } from '@/hooks/queries/useLeave';
 import { useCreateLeaveRequest } from '@/hooks/mutations/useLeaveMutations';
 import { formatDate } from '@/lib/utils/date.utils';
 import { LeaveRequest, LeaveType } from '@/lib/types';
-import { Colors, Typography, Spacing, BorderRadius, Shadows, Gradients, StatusColors } from '@/constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows, Gradients, StatusColors, FontFamily } from '@/constants/theme';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 const LEAVE_TYPES: LeaveType[] = ['sick', 'casual', 'earned', 'unpaid', 'other'];
@@ -697,6 +697,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: Spacing.md,
     fontSize: Typography.fontSize.base,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
   },
   textArea: {
@@ -754,11 +755,15 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     backgroundColor: Colors.indigo,
-    shadowColor: Colors.indigo,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: Colors.indigo,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+    }),
   },
   submitButtonText: {
     color: Colors.textInverse,

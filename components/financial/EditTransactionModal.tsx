@@ -12,6 +12,7 @@ import { Text } from '@/components/ui/Text';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DatePicker from '@/components/ui/DatePicker';
 import { useCategories } from '@/hooks/queries/useFinancial';
+import { FontFamily } from '@/constants/theme';
 
 interface EditTransactionModalProps {
   visible: boolean;
@@ -446,6 +447,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 15,
+    fontFamily: FontFamily.regular,
     color: '#1E293B',
     backgroundColor: '#FFFFFF',
   },

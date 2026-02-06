@@ -35,7 +35,7 @@ import { Text } from "@/components/ui/Text";
 import ConfirmDeleteModal from "@/components/ui/ConfirmDeleteModal";
 import TeamHeroHeader from "@/components/team/TeamHeroHeader";
 import TeamSummaryStats from "@/components/team/TeamSummaryStats";
-import { Colors, Spacing, BorderRadius, Shadows } from "@/constants/theme";
+import { Colors, Spacing, BorderRadius, Shadows, FontFamily } from "@/constants/theme";
 import Animated, { FadeInDown, FadeIn } from "react-native-reanimated";
 
 type FilterType = "all" | "active" | "inactive" | "new" | "needs-setup" | "incomplete";
@@ -755,6 +755,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 15,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
   },
 

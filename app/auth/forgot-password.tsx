@@ -7,15 +7,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
-  Image,
 } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useAlert } from "@/hooks/useAlert";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { Text } from "@/components/ui/Text";
+import { DepthButton } from "@/components/ui/DepthButton";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useResetPassword } from "@/hooks/mutations/useAuthMutations";
-import { Colors, BorderRadius, Shadows, Gradients } from "@/constants/theme";
+import { Colors, BorderRadius, Gradients, Typography, Spacing, FontFamily } from "@/constants/theme";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
@@ -40,7 +42,6 @@ export default function ForgotPasswordScreen() {
       error("Error", "Please enter your email address");
       return;
     }
-
     resetPasswordMutation.mutate({ email });
   };
 
@@ -48,100 +49,74 @@ export default function ForgotPasswordScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Gradient Header */}
-      <LinearGradient
-        colors={Gradients.saffronHero}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.headerGradient}
-      >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-
-        <View style={styles.logoSection}>
-          <Image
-            source={require("@/assets/images/logovs.png")}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-          <Text style={styles.appName}>VYAPAAR SEWA</Text>
-        </View>
+      {/* Hero Section */}
+      <LinearGradient colors={Gradients.saffronHero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroSection}>
+        <SafeAreaView edges={["top"]} style={styles.heroContent}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="arrow-back" size={22} color={Colors.textInverse} />
+          </TouchableOpacity>
+          <Text style={styles.heroTitle}>Reset Password</Text>
+          <Text style={styles.heroSubtitle}>We'll send you reset instructions</Text>
+        </SafeAreaView>
       </LinearGradient>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.formContainer}
-      >
-        <View style={styles.card}>
-          <View style={styles.iconContainer}>
-            <MaterialCommunityIcons
-              name="lock-reset"
-              size={48}
-              color={Colors.primary}
-            />
-          </View>
+      {/* Form */}
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.formContainer}>
+        <View style={styles.content}>
+          {/* Icon */}
+          <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.iconWrapper}>
+            <MaterialCommunityIcons name="lock-reset" size={40} color={Colors.primary} />
+          </Animated.View>
 
-          <Text style={styles.title}>Forgot Password?</Text>
-          <Text style={styles.subtitle}>
-            Enter your email address and we'll send you instructions to reset your password.
-          </Text>
+          <Animated.View entering={FadeInDown.delay(150).springify()}>
+            <Text style={styles.title}>Forgot your password?</Text>
+            <Text style={styles.subtitle}>
+              Enter your email address and we'll send you a link to reset your password.
+            </Text>
+          </Animated.View>
 
-          <View style={styles.form}>
-            <View style={[styles.inputContainer, emailFocused && styles.inputContainerFocused]}>
-              <MaterialCommunityIcons
-                name="email-outline"
-                size={20}
-                color={emailFocused ? Colors.primary : Colors.gray400}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Email"
-                placeholderTextColor={Colors.gray400}
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                editable={!resetPasswordMutation.isPending}
-                onFocus={() => setEmailFocused(true)}
-                onBlur={() => setEmailFocused(false)}
-              />
+          {/* Email */}
+          <Animated.View entering={FadeInDown.delay(200).springify()} style={[styles.inputContainer, emailFocused && styles.inputContainerFocused]}>
+            <View style={[styles.inputIcon, emailFocused && styles.inputIconFocused]}>
+              <MaterialCommunityIcons name="email-outline" size={20} color={emailFocused ? Colors.primary : Colors.gray400} />
             </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor={Colors.textTertiary}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              editable={!resetPasswordMutation.isPending}
+              onFocus={() => setEmailFocused(true)}
+              onBlur={() => setEmailFocused(false)}
+            />
+          </Animated.View>
 
-            <TouchableOpacity
-              style={[
-                styles.button,
-                resetPasswordMutation.isPending && styles.buttonDisabled,
-              ]}
+          {/* Back to Login */}
+          <Animated.View entering={FadeInDown.delay(250).springify()}>
+            <TouchableOpacity style={styles.backToLogin} onPress={() => router.back()} disabled={resetPasswordMutation.isPending}>
+              <Ionicons name="arrow-back" size={16} color={Colors.primary} />
+              <Text style={styles.backToLoginText}>Back to Sign In</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+
+        {/* Bottom CTA */}
+        <SafeAreaView edges={["bottom"]} style={styles.bottomCTA}>
+          <Animated.View entering={FadeInDown.delay(300).springify()}>
+            <DepthButton
               onPress={handleResetPassword}
               disabled={resetPasswordMutation.isPending}
+              loading={resetPasswordMutation.isPending}
+              variant="primary"
+              size="lg"
             >
-              <LinearGradient
-                colors={[Colors.primary, Colors.primaryDark]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.buttonGradient}
-              >
-                <Text style={styles.buttonText}>
-                  {resetPasswordMutation.isPending ? "Sending..." : "Send Reset Link"}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.linkButton}
-              onPress={() => router.back()}
-              disabled={resetPasswordMutation.isPending}
-            >
-              <Ionicons name="arrow-back" size={16} color={Colors.primary} />
-              <Text style={styles.linkText}>Back to Login</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+              {resetPasswordMutation.isPending ? "Sending..." : "Send Reset Link"}
+            </DepthButton>
+          </Animated.View>
+        </SafeAreaView>
       </KeyboardAvoidingView>
     </View>
   );
@@ -150,122 +125,120 @@ export default function ForgotPasswordScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.gray50,
+    backgroundColor: Colors.background,
   },
-  headerGradient: {
-    paddingTop: Platform.OS === "ios" ? 60 : 50,
-    paddingBottom: 40,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
+  heroSection: {
+    borderBottomLeftRadius: BorderRadius["3xl"],
+    borderBottomRightRadius: BorderRadius["3xl"],
+  },
+  heroContent: {
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing["2xl"],
+    paddingHorizontal: Spacing.lg,
   },
   backButton: {
-    position: "absolute",
-    top: Platform.OS === "ios" ? 60 : 50,
-    left: 20,
-    zIndex: 10,
-    padding: 8,
-  },
-  logoSection: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.15)",
     alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.lg,
   },
-  logo: {
-    width: 100,
-    height: 100,
-    marginBottom: 8,
-  },
-  appName: {
-    fontSize: 22,
+  heroTitle: {
+    fontSize: Typography.fontSize["2xl"],
     fontWeight: "800",
     color: Colors.textInverse,
-    textShadowColor: "rgba(0, 0, 0, 0.2)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    letterSpacing: -0.5,
+  },
+  heroSubtitle: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: "500",
+    color: "rgba(255,255,255,0.85)",
+    marginTop: Spacing.xs,
   },
   formContainer: {
     flex: 1,
-    marginTop: -20,
-    paddingHorizontal: 20,
   },
-  card: {
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius["2xl"],
-    padding: 24,
-    ...Shadows.lg,
+  content: {
+    flex: 1,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
   },
-  iconContainer: {
+  iconWrapper: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.primary + "10",
     alignItems: "center",
-    marginBottom: 16,
+    justifyContent: "center",
+    alignSelf: "center",
+    marginBottom: Spacing.lg,
   },
   title: {
-    fontSize: 24,
+    fontSize: Typography.fontSize.xl,
     fontWeight: "700",
-    textAlign: "center",
     color: Colors.text,
+    textAlign: "center",
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 14,
-    textAlign: "center",
-    marginTop: 8,
-    marginBottom: 24,
+    fontSize: Typography.fontSize.sm,
     color: Colors.textSecondary,
-    lineHeight: 22,
-  },
-  form: {
-    width: "100%",
+    textAlign: "center",
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xl,
+    lineHeight: 20,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1.5,
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: BorderRadius.lg,
-    marginBottom: 16,
-    backgroundColor: Colors.gray50,
-    paddingHorizontal: 16,
   },
   inputContainerFocused: {
     borderColor: Colors.primary,
     backgroundColor: Colors.background,
   },
   inputIcon: {
-    marginRight: 12,
+    width: 44,
+    height: 52,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inputIconFocused: {
+    backgroundColor: Colors.primary + "08",
+    borderTopLeftRadius: BorderRadius.xl - 1,
+    borderBottomLeftRadius: BorderRadius.xl - 1,
   },
   input: {
     flex: 1,
-    padding: 16,
-    paddingLeft: 0,
-    fontSize: 16,
+    paddingVertical: Spacing.md,
+    paddingRight: Spacing.md,
+    fontSize: Typography.fontSize.base,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
   },
-  button: {
-    borderRadius: BorderRadius.lg,
-    marginTop: 8,
-    overflow: "hidden",
-    ...Shadows.button,
-  },
-  buttonGradient: {
-    padding: 16,
-    alignItems: "center",
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: Colors.textInverse,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  linkButton: {
+  backToLogin: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    padding: 8,
-    marginTop: 20,
-    gap: 6,
+    gap: Spacing.sm,
+    paddingVertical: Spacing.xl,
   },
-  linkText: {
-    color: Colors.primary,
-    fontSize: 14,
+  backToLoginText: {
+    fontSize: Typography.fontSize.sm,
     fontWeight: "600",
+    color: Colors.primary,
+  },
+  bottomCTA: {
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    backgroundColor: Colors.background,
   },
 });

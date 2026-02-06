@@ -370,11 +370,15 @@ const styles = StyleSheet.create({
   },
   saveFooterButton: {
     backgroundColor: '#6366F1',
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+    }),
   },
   saveFooterButtonDisabled: {
     opacity: 0.5,

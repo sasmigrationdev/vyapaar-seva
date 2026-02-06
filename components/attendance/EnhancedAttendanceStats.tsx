@@ -1,7 +1,17 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  withSpring,
+  FadeInUp,
+  interpolate,
+  Easing,
+} from 'react-native-reanimated';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '@/constants/theme';
 import { formatHours } from '@/lib/utils/attendance.utils';
 
@@ -16,6 +26,7 @@ interface EnhancedAttendanceStatsProps {
   isLoading?: boolean;
   showEmployeeCount?: boolean;
   employeeCount?: number;
+  animate?: boolean;
 }
 
 interface StatCardProps {
@@ -25,21 +36,76 @@ interface StatCardProps {
   color: string;
   bgColor: string;
   isLoading?: boolean;
+  index: number;
+  animate?: boolean;
 }
 
-const StatCard = ({ icon, value, label, color, bgColor, isLoading }: StatCardProps) => (
-  <View style={[styles.statCard, { backgroundColor: bgColor }]}>
-    <View style={[styles.iconContainer, { backgroundColor: color + '20' }]}>
-      {icon}
-    </View>
-    {isLoading ? (
-      <ActivityIndicator size="small" color={color} style={styles.loader} />
-    ) : (
-      <Text style={[styles.statValue, { color }]}>{value}</Text>
-    )}
-    <Text style={styles.statLabel}>{label}</Text>
-  </View>
-);
+// Animated number counter hook
+const useAnimatedNumber = (targetValue: number, animate: boolean, delay: number = 0) => {
+  const animatedValue = useSharedValue(0);
+
+  useEffect(() => {
+    if (animate && !isNaN(targetValue)) {
+      animatedValue.value = withDelay(
+        delay,
+        withTiming(targetValue, {
+          duration: 800,
+          easing: Easing.out(Easing.cubic),
+        })
+      );
+    } else {
+      animatedValue.value = targetValue;
+    }
+  }, [targetValue, animate, delay, animatedValue]);
+
+  return animatedValue;
+};
+
+const AnimatedStatCard = ({
+  icon,
+  value,
+  label,
+  color,
+  bgColor,
+  isLoading,
+  index,
+  animate = true,
+}: StatCardProps) => {
+  const scale = useSharedValue(animate ? 0.8 : 1);
+  const opacity = useSharedValue(animate ? 0 : 1);
+
+  useEffect(() => {
+    if (animate) {
+      scale.value = withDelay(
+        index * 100,
+        withSpring(1, { damping: 12, stiffness: 100 })
+      );
+      opacity.value = withDelay(
+        index * 100,
+        withTiming(1, { duration: 300 })
+      );
+    }
+  }, [animate, index, scale, opacity]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View style={[styles.statCard, { backgroundColor: bgColor }, animatedStyle]}>
+      <View style={[styles.iconContainer, { backgroundColor: color + '20' }]}>
+        {icon}
+      </View>
+      {isLoading ? (
+        <ActivityIndicator size="small" color={color} style={styles.loader} />
+      ) : (
+        <Text style={[styles.statValue, { color }]}>{value}</Text>
+      )}
+      <Text style={styles.statLabel}>{label}</Text>
+    </Animated.View>
+  );
+};
 
 export default function EnhancedAttendanceStats({
   totalWorkingHours,
@@ -52,6 +118,7 @@ export default function EnhancedAttendanceStats({
   isLoading = false,
   showEmployeeCount = false,
   employeeCount = 0,
+  animate = true,
 }: EnhancedAttendanceStatsProps) {
   const percentage = attendancePercentage ?? (expectedDays > 0
     ? Math.round((attendedDays / expectedDays) * 100)
@@ -67,67 +134,81 @@ export default function EnhancedAttendanceStats({
     <View style={styles.container}>
       {/* Row 1 */}
       <View style={styles.row}>
-        <StatCard
+        <AnimatedStatCard
           icon={<MaterialCommunityIcons name="clock-outline" size={20} color={Colors.info} />}
           value={formatHours(totalWorkingHours)}
           label="Total Hours"
           color={Colors.info}
           bgColor={Colors.info + '08'}
           isLoading={isLoading}
+          index={0}
+          animate={animate}
         />
-        <StatCard
+        <AnimatedStatCard
           icon={<Ionicons name="calendar-outline" size={20} color={Colors.success} />}
           value={`${attendedDays}/${expectedDays}`}
           label="Days Attended"
           color={Colors.success}
           bgColor={Colors.success + '08'}
           isLoading={isLoading}
+          index={1}
+          animate={animate}
         />
-        <StatCard
+        <AnimatedStatCard
           icon={<Feather name="umbrella" size={20} color={Colors.accent} />}
           value={leavesTaken}
           label="Leaves"
           color={Colors.accent}
           bgColor={Colors.accent + '08'}
           isLoading={isLoading}
+          index={2}
+          animate={animate}
         />
       </View>
 
       {/* Row 2 */}
       <View style={styles.row}>
-        <StatCard
+        <AnimatedStatCard
           icon={<Ionicons name="close-circle-outline" size={20} color={Colors.error} />}
           value={absentDays}
           label="Absent"
           color={Colors.error}
           bgColor={Colors.error + '08'}
           isLoading={isLoading}
+          index={3}
+          animate={animate}
         />
-        <StatCard
+        <AnimatedStatCard
           icon={<MaterialCommunityIcons name="clock-plus-outline" size={20} color="#8B5CF6" />}
           value={formatHours(overtimeHours)}
           label="Overtime"
           color="#8B5CF6"
           bgColor="#8B5CF608"
           isLoading={isLoading}
+          index={4}
+          animate={animate}
         />
         {showEmployeeCount ? (
-          <StatCard
+          <AnimatedStatCard
             icon={<Ionicons name="people-outline" size={20} color={Colors.primary} />}
             value={employeeCount}
             label="Employees"
             color={Colors.primary}
             bgColor={Colors.primary + '08'}
             isLoading={isLoading}
+            index={5}
+            animate={animate}
           />
         ) : (
-          <StatCard
+          <AnimatedStatCard
             icon={<Ionicons name="trending-up-outline" size={20} color={getPercentageColor()} />}
             value={`${percentage}%`}
             label="Attendance"
             color={getPercentageColor()}
             bgColor={getPercentageColor() + '08'}
             isLoading={isLoading}
+            index={5}
+            animate={animate}
           />
         )}
       </View>

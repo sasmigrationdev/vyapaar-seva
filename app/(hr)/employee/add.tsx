@@ -12,7 +12,7 @@ import BankAccountForm from '@/components/employee/BankAccountForm';
 import WorkingDaysSelector from '@/components/employee/WorkingDaysSelector';
 import DatePicker from '@/components/ui/DatePicker';
 import { Text } from '@/components/ui/Text';
-import { BorderRadius, Colors, Shadows, Spacing } from '@/constants/theme';
+import { BorderRadius, Colors, Shadows, Spacing, FontFamily } from '@/constants/theme';
 import { useCreateEmployee } from '@/hooks/mutations/useOrganizationMutations';
 import { useCurrentOrganization } from '@/hooks/queries/useOrganization';
 import { useAlert } from '@/hooks/useAlert';
@@ -736,6 +736,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
     paddingVertical: 0,
   },
@@ -910,11 +911,15 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md + 2,
     borderRadius: BorderRadius.xl,
     gap: Spacing.sm,
-    shadowColor: Colors.success,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: Colors.success,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+    }),
   },
   submitButtonText: {
     fontSize: 16,

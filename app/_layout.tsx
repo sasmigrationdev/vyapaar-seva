@@ -1,4 +1,4 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -15,7 +15,7 @@ import {
 } from '@expo-google-fonts/funnel-sans';
 import * as SplashScreen from 'expo-splash-screen';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+// Note: useColorScheme removed - forcing light theme for consistency
 import { QueryProvider } from '@/lib/providers/QueryProvider';
 import { useAuth } from '@/hooks/auth/useAuth';
 import { AlertProvider } from '@/hooks/useAlert';
@@ -146,8 +146,6 @@ const styles = StyleSheet.create({
 });
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   console.log('[RootLayout] Rendering...');
 
   // Load Funnel Sans fonts
@@ -179,9 +177,10 @@ export default function RootLayout() {
   return (
     <QueryProvider>
       <AlertProvider>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        {/* Force light theme for consistency across iOS and Android */}
+        <ThemeProvider value={DefaultTheme}>
           <RootLayoutNav />
-          <StatusBar style="auto" />
+          <StatusBar style="dark" />
         </ThemeProvider>
       </AlertProvider>
     </QueryProvider>

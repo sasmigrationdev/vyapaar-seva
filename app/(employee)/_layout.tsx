@@ -4,12 +4,11 @@ import { Platform, StyleSheet, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function EmployeeLayout() {
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  // Force light theme to match iOS appearance
+  const isDark = false;
 
   const TabIconContainer = ({ focused, children }: { focused: boolean; children: ReactNode }) => (
     <View

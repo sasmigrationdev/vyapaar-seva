@@ -1,12 +1,11 @@
 import { Tabs } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Typography } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import AnimatedTabBar from '@/components/ui/AnimatedTabBar';
 
 export default function HRLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  // Force light theme to match iOS appearance
+  const isDark = false;
 
   return (
     <Tabs

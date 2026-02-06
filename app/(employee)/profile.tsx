@@ -25,7 +25,7 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useAutoCheckinSetting } from '@/hooks/queries/useUserSettings';
 import { useUpdateAutoCheckinSetting } from '@/hooks/mutations/useUserSettingsMutations';
 import { formatDate } from '@/lib/utils/date.utils';
-import { Colors, Typography, Spacing, BorderRadius, Shadows, Gradients, CardStyles } from '@/constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows, Gradients, CardStyles, FontFamily } from '@/constants/theme';
 import { LocalAuthSettings } from '@/components/localAuth/LocalAuthSettings';
 import { EditPersonalInfoModal, EditBankInfoModal } from '@/components/profile';
 
@@ -1312,6 +1312,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
     fontSize: Typography.fontSize.base,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
   },
   eyeIcon: {

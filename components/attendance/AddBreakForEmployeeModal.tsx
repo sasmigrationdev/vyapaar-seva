@@ -23,6 +23,7 @@ import TimePicker from '@/components/ui/TimePicker';
 import DatePicker from '@/components/ui/DatePicker';
 import { formatDate } from '@/lib/utils/date.utils';
 import { AttendanceBreak } from '@/lib/types';
+import { FontFamily } from '@/constants/theme';
 
 interface AddBreakForEmployeeModalProps {
   visible: boolean;
@@ -804,6 +805,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 14,
+    fontFamily: FontFamily.regular,
     color: '#0F172A',
   },
   selectedEmployeeCard: {
@@ -1009,11 +1011,15 @@ const styles = StyleSheet.create({
   },
   assignButton: {
     backgroundColor: '#F59E0B',
-    shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+    }),
   },
   assignButtonDisabled: {
     opacity: 0.5,

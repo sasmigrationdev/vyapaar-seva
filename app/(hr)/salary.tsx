@@ -8,7 +8,7 @@ import {
   SalaryActionBar,
   type EmployeeStatus,
 } from "@/components/salary";
-import { BorderRadius, Colors, Spacing, Typography } from "@/constants/theme";
+import { BorderRadius, Colors, Spacing, Typography, FontFamily } from "@/constants/theme";
 import { useAuth } from "@/hooks/auth/useAuth";
 import { useAllCurrentMonthEarnings } from "@/hooks/queries/useEarnings";
 import { useAllUsers } from "@/hooks/queries/useUser";
@@ -585,6 +585,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: Typography.fontSize.base,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
     paddingVertical: 0,
   },

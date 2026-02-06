@@ -1,7 +1,4 @@
-import {
-  useSignUpAsEmployee,
-  useSignUpAsEmployer,
-} from "@/hooks/mutations/useAuthMutations";
+import { useSignUpAsEmployee, useSignUpAsEmployer } from "@/hooks/mutations/useAuthMutations";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -14,14 +11,16 @@ import {
   TouchableOpacity,
   View,
   StatusBar,
-  Image,
 } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useAlert } from "@/hooks/useAlert";
 import { LinearGradient } from "expo-linear-gradient";
 import { Text } from "@/components/ui/Text";
-import { Colors, BorderRadius, Shadows, Spacing, Gradients } from "@/constants/theme";
+import { DepthButton } from "@/components/ui/DepthButton";
+import { Colors, BorderRadius, Gradients, Typography, Spacing, FontFamily } from "@/constants/theme";
 import { GoogleSignInButton } from "@/components/ui/GoogleSignInButton";
 import { IS_GOOGLE_CONFIGURED } from "@/hooks/auth/useGoogleAuth";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type UserType = "employer" | "employee";
 
@@ -36,64 +35,49 @@ export default function SignupScreen() {
     phone: "",
   });
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const employerSignUpMutation = useSignUpAsEmployer({
     onSuccess: (data) => {
       const employerCode = data.employerData.employerCode || "N/A";
       success(
-        "Success!",
-        `Your employer account has been created!\n\nYour Employer Code: ${employerCode}\n\nPlease save this code - employees will use it to find and join your organization.`,
+        "Account Created!",
+        `Your Employer Code: ${employerCode}\n\nSave this code - employees will use it to join your organization.`,
         () => router.replace("/auth/login")
       );
     },
     onError: (err: any) => {
-      console.error("===== EMPLOYER SIGNUP ERROR =====");
-      console.error("Error:", err);
-      console.error("================================");
-      error(
-        "Signup Failed",
-        err?.message || "Failed to create employer account"
-      );
+      error("Signup Failed", err?.message || "Failed to create employer account");
     },
   });
 
   const employeeSignUpMutation = useSignUpAsEmployee({
     onSuccess: () => {
       success(
-        "Success!",
-        "Your employee account has been created!\n\nNext step: Search for your employer by their code, organization name, or email, and send a join request.",
+        "Account Created!",
+        "Search for your employer and send a join request to get started.",
         () => router.replace("/auth/login")
       );
     },
     onError: (err: any) => {
-      console.error("===== EMPLOYEE SIGNUP ERROR =====");
-      console.error("Error:", err);
-      console.error("================================");
-      error(
-        "Signup Failed",
-        err?.message || "Failed to create employee account"
-      );
+      error("Signup Failed", err?.message || "Failed to create employee account");
     },
   });
 
   const handleSignup = () => {
-    // Validation
     if (!formData.email || !formData.password || !formData.fullName) {
       error("Error", "Please fill in all required fields");
       return;
     }
-
     if (formData.password !== formData.confirmPassword) {
       error("Error", "Passwords do not match");
       return;
     }
-
     if (formData.password.length < 6) {
       error("Error", "Password must be at least 6 characters");
       return;
     }
 
-    // Sign up based on user type
     if (userType === "employer") {
       employerSignUpMutation.mutate({
         email: formData.email,
@@ -115,330 +99,210 @@ export default function SignupScreen() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const isLoading =
-    employerSignUpMutation.isPending || employeeSignUpMutation.isPending;
+  const isLoading = employerSignUpMutation.isPending || employeeSignUpMutation.isPending;
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Gradient Header */}
-      <LinearGradient
-        colors={Gradients.saffronHero}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.headerGradient}
-      >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-
-        <View style={styles.logoSection}>
-          <Image
-            source={require("@/assets/images/logovs.png")}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-          <Text style={styles.appName}>VYAPAAR SEWA</Text>
-        </View>
+      {/* Hero Section */}
+      <LinearGradient colors={Gradients.saffronHero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroSection}>
+        <SafeAreaView edges={["top"]} style={styles.heroContent}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="arrow-back" size={22} color={Colors.textInverse} />
+          </TouchableOpacity>
+          <Text style={styles.heroTitle}>Create Account</Text>
+          <Text style={styles.heroSubtitle}>
+            {userType === "employer" ? "Register your organization" : "Join as an employee"}
+          </Text>
+        </SafeAreaView>
       </LinearGradient>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.formContainer}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.card}>
-            <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>
-              {userType === "employer"
-                ? "Register your organization"
-                : "Join as an employee"}
-            </Text>
-
-            <View style={styles.form}>
-              {/* User Type Selection - First */}
-              <View style={styles.typeSection}>
-                <Text style={styles.typeSectionTitle}>I am...</Text>
-                <View style={styles.typeButtons}>
-                  <TouchableOpacity
-                    style={[
-                      styles.typeButton,
-                      userType === "employee" && styles.typeButtonActive,
-                    ]}
-                    onPress={() => setUserType("employee")}
-                    disabled={isLoading}
-                    accessibilityLabel="Sign up as an Employee"
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: userType === "employee", disabled: isLoading }}
-                    accessibilityHint="Join an organization as an employee"
-                  >
-                    <MaterialCommunityIcons
-                      name="account"
-                      size={32}
-                      color={userType === "employee" ? Colors.primary : Colors.gray400}
-                    />
-                    <Text
-                      style={[
-                        styles.typeButtonText,
-                        userType === "employee" && styles.typeButtonTextActive,
-                      ]}
-                    >
-                      An Employee
-                    </Text>
-                    <Text style={styles.typeButtonSubtext}>
-                      Join an organization
-                    </Text>
-                    {userType === "employee" && (
-                      <View style={styles.typeCheckmark}>
-                        <MaterialCommunityIcons
-                          name="check-circle"
-                          size={20}
-                          color={Colors.primary}
-                        />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.typeButton,
-                      userType === "employer" && styles.typeButtonActive,
-                    ]}
-                    onPress={() => setUserType("employer")}
-                    disabled={isLoading}
-                    accessibilityLabel="Sign up as an Employer"
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: userType === "employer", disabled: isLoading }}
-                    accessibilityHint="Register your business as an employer"
-                  >
-                    <MaterialCommunityIcons
-                      name="office-building"
-                      size={32}
-                      color={userType === "employer" ? Colors.primary : Colors.gray400}
-                    />
-                    <Text
-                      style={[
-                        styles.typeButtonText,
-                        userType === "employer" && styles.typeButtonTextActive,
-                      ]}
-                    >
-                      An Employer
-                    </Text>
-                    <Text style={styles.typeButtonSubtext}>
-                      Register my business
-                    </Text>
-                    {userType === "employer" && (
-                      <View style={styles.typeCheckmark}>
-                        <MaterialCommunityIcons
-                          name="check-circle"
-                          size={20}
-                          color={Colors.primary}
-                        />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Google Sign-In Option */}
-              {IS_GOOGLE_CONFIGURED && (
-                <>
-                  <GoogleSignInButton
-                    onError={(err) => error("Google Sign-In Failed", err)}
-                    disabled={isLoading}
-                  />
-
-                  <View style={styles.dividerContainer}>
-                    <View style={styles.divider} />
-                    <Text style={styles.dividerText}>OR SIGN UP WITH EMAIL</Text>
-                    <View style={styles.divider} />
-                  </View>
-                </>
-              )}
-
-              {/* Common fields */}
-              <View style={[styles.inputContainer, focusedField === 'fullName' && styles.inputContainerFocused]}>
-                <MaterialCommunityIcons
-                  name="account-outline"
-                  size={20}
-                  color={focusedField === 'fullName' ? Colors.primary : Colors.gray400}
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Full Name *"
-                  placeholderTextColor={Colors.gray400}
-                  value={formData.fullName}
-                  onChangeText={(value) => updateField("fullName", value)}
-                  editable={!isLoading}
-                  onFocus={() => setFocusedField('fullName')}
-                  onBlur={() => setFocusedField(null)}
-                  accessibilityLabel="Full name, required"
-                  accessibilityHint="Enter your full name"
-                />
-              </View>
-
-              <View style={[styles.inputContainer, focusedField === 'email' && styles.inputContainerFocused]}>
-                <MaterialCommunityIcons
-                  name="email-outline"
-                  size={20}
-                  color={focusedField === 'email' ? Colors.primary : Colors.gray400}
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email *"
-                  placeholderTextColor={Colors.gray400}
-                  value={formData.email}
-                  onChangeText={(value) => updateField("email", value)}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  editable={!isLoading}
-                  onFocus={() => setFocusedField('email')}
-                  onBlur={() => setFocusedField(null)}
-                  accessibilityLabel="Email address, required"
-                  accessibilityHint="Enter your email address"
-                />
-              </View>
-
-              {/* Employee-specific fields */}
-              {userType === "employee" && (
-                <View style={[styles.inputContainer, focusedField === 'phone' && styles.inputContainerFocused]}>
-                  <MaterialCommunityIcons
-                    name="phone-outline"
-                    size={20}
-                    color={focusedField === 'phone' ? Colors.primary : Colors.gray400}
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Phone (optional)"
-                    placeholderTextColor={Colors.gray400}
-                    value={formData.phone}
-                    onChangeText={(value) => updateField("phone", value)}
-                    keyboardType="phone-pad"
-                    editable={!isLoading}
-                    onFocus={() => setFocusedField('phone')}
-                    onBlur={() => setFocusedField(null)}
-                    accessibilityLabel="Phone number, optional"
-                    accessibilityHint="Enter your phone number"
-                  />
-                </View>
-              )}
-
-              <View style={[styles.inputContainer, focusedField === 'password' && styles.inputContainerFocused]}>
-                <MaterialCommunityIcons
-                  name="lock-outline"
-                  size={20}
-                  color={focusedField === 'password' ? Colors.primary : Colors.gray400}
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Password *"
-                  placeholderTextColor={Colors.gray400}
-                  value={formData.password}
-                  onChangeText={(value) => updateField("password", value)}
-                  secureTextEntry
-                  editable={!isLoading}
-                  onFocus={() => setFocusedField('password')}
-                  onBlur={() => setFocusedField(null)}
-                  accessibilityLabel="Password, required"
-                  accessibilityHint="Create a secure password"
-                />
-              </View>
-
-              <View style={[styles.inputContainer, focusedField === 'confirmPassword' && styles.inputContainerFocused]}>
-                <MaterialCommunityIcons
-                  name="lock-check-outline"
-                  size={20}
-                  color={focusedField === 'confirmPassword' ? Colors.primary : Colors.gray400}
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Confirm Password *"
-                  placeholderTextColor={Colors.gray400}
-                  value={formData.confirmPassword}
-                  onChangeText={(value) => updateField("confirmPassword", value)}
-                  secureTextEntry
-                  editable={!isLoading}
-                  onFocus={() => setFocusedField('confirmPassword')}
-                  onBlur={() => setFocusedField(null)}
-                  accessibilityLabel="Confirm password, required"
-                  accessibilityHint="Re-enter your password to confirm"
-                />
-              </View>
-
-              {/* Info message */}
-              {userType === "employer" && (
-                <View style={styles.infoBox}>
-                  <MaterialCommunityIcons
-                    name="information"
-                    size={20}
-                    color={Colors.primary}
-                  />
-                  <Text style={styles.infoText}>
-                    You'll receive a unique employer code that employees can use
-                    to find and join your organization.
-                  </Text>
-                </View>
-              )}
-
-              {userType === "employee" && (
-                <View style={styles.infoBox}>
-                  <MaterialCommunityIcons
-                    name="information"
-                    size={20}
-                    color={Colors.primary}
-                  />
-                  <Text style={styles.infoText}>
-                    After signup, search for your employer and send a join request
-                    to get started.
-                  </Text>
-                </View>
-              )}
-
+      {/* Form */}
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.formContainer}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          {/* Role Selection */}
+          <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.roleSection}>
+            <Text style={styles.sectionLabel}>I am...</Text>
+            <View style={styles.roleButtons}>
               <TouchableOpacity
-                style={[styles.button, isLoading && styles.buttonDisabled]}
-                onPress={handleSignup}
+                style={[styles.roleButton, userType === "employee" && styles.roleButtonActive]}
+                onPress={() => setUserType("employee")}
                 disabled={isLoading}
+                activeOpacity={0.7}
               >
-                <LinearGradient
-                  colors={[Colors.primary, Colors.primaryDark]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.buttonGradient}
-                >
-                  <Text style={styles.buttonText}>
-                    {isLoading ? "Creating Account..." : "Sign Up"}
-                  </Text>
-                </LinearGradient>
+                <View style={[styles.roleIcon, userType === "employee" && styles.roleIconActive]}>
+                  <MaterialCommunityIcons name="account" size={24} color={userType === "employee" ? Colors.primary : Colors.gray400} />
+                </View>
+                <Text style={[styles.roleTitle, userType === "employee" && styles.roleTitleActive]}>Employee</Text>
+                <Text style={styles.roleSubtitle}>Join organization</Text>
+                {userType === "employee" && (
+                  <View style={styles.roleCheck}>
+                    <Ionicons name="checkmark" size={14} color={Colors.textInverse} />
+                  </View>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.linkButton}
-                onPress={() => router.back()}
+                style={[styles.roleButton, userType === "employer" && styles.roleButtonActive]}
+                onPress={() => setUserType("employer")}
                 disabled={isLoading}
+                activeOpacity={0.7}
               >
-                <Text style={styles.linkText}>
-                  Already have an account? Login
-                </Text>
+                <View style={[styles.roleIcon, userType === "employer" && styles.roleIconActive]}>
+                  <MaterialCommunityIcons name="office-building" size={24} color={userType === "employer" ? Colors.primary : Colors.gray400} />
+                </View>
+                <Text style={[styles.roleTitle, userType === "employer" && styles.roleTitleActive]}>Employer</Text>
+                <Text style={styles.roleSubtitle}>Register business</Text>
+                {userType === "employer" && (
+                  <View style={styles.roleCheck}>
+                    <Ionicons name="checkmark" size={14} color={Colors.textInverse} />
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
-          </View>
+          </Animated.View>
+
+          {/* Google Sign-In */}
+          {IS_GOOGLE_CONFIGURED && (
+            <Animated.View entering={FadeInDown.delay(150).springify()}>
+              <GoogleSignInButton onError={(err) => error("Google Sign-In Failed", err)} disabled={isLoading} />
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or continue with email</Text>
+                <View style={styles.dividerLine} />
+              </View>
+            </Animated.View>
+          )}
+
+          {/* Full Name */}
+          <Animated.View entering={FadeInDown.delay(200).springify()} style={[styles.inputContainer, focusedField === "fullName" && styles.inputContainerFocused]}>
+            <View style={[styles.inputIcon, focusedField === "fullName" && styles.inputIconFocused]}>
+              <MaterialCommunityIcons name="account-outline" size={20} color={focusedField === "fullName" ? Colors.primary : Colors.gray400} />
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Full Name"
+              placeholderTextColor={Colors.textTertiary}
+              value={formData.fullName}
+              onChangeText={(v) => updateField("fullName", v)}
+              editable={!isLoading}
+              onFocus={() => setFocusedField("fullName")}
+              onBlur={() => setFocusedField(null)}
+            />
+          </Animated.View>
+
+          {/* Email */}
+          <Animated.View entering={FadeInDown.delay(250).springify()} style={[styles.inputContainer, focusedField === "email" && styles.inputContainerFocused]}>
+            <View style={[styles.inputIcon, focusedField === "email" && styles.inputIconFocused]}>
+              <MaterialCommunityIcons name="email-outline" size={20} color={focusedField === "email" ? Colors.primary : Colors.gray400} />
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor={Colors.textTertiary}
+              value={formData.email}
+              onChangeText={(v) => updateField("email", v)}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              editable={!isLoading}
+              onFocus={() => setFocusedField("email")}
+              onBlur={() => setFocusedField(null)}
+            />
+          </Animated.View>
+
+          {/* Phone (Employee only) */}
+          {userType === "employee" && (
+            <Animated.View entering={FadeInDown.delay(300).springify()} style={[styles.inputContainer, focusedField === "phone" && styles.inputContainerFocused]}>
+              <View style={[styles.inputIcon, focusedField === "phone" && styles.inputIconFocused]}>
+                <MaterialCommunityIcons name="phone-outline" size={20} color={focusedField === "phone" ? Colors.primary : Colors.gray400} />
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Phone (optional)"
+                placeholderTextColor={Colors.textTertiary}
+                value={formData.phone}
+                onChangeText={(v) => updateField("phone", v)}
+                keyboardType="phone-pad"
+                editable={!isLoading}
+                onFocus={() => setFocusedField("phone")}
+                onBlur={() => setFocusedField(null)}
+              />
+            </Animated.View>
+          )}
+
+          {/* Password */}
+          <Animated.View entering={FadeInDown.delay(350).springify()} style={[styles.inputContainer, focusedField === "password" && styles.inputContainerFocused]}>
+            <View style={[styles.inputIcon, focusedField === "password" && styles.inputIconFocused]}>
+              <MaterialCommunityIcons name="lock-outline" size={20} color={focusedField === "password" ? Colors.primary : Colors.gray400} />
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor={Colors.textTertiary}
+              value={formData.password}
+              onChangeText={(v) => updateField("password", v)}
+              secureTextEntry={!showPassword}
+              editable={!isLoading}
+              onFocus={() => setFocusedField("password")}
+              onBlur={() => setFocusedField(null)}
+            />
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
+              <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={Colors.gray400} />
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Confirm Password */}
+          <Animated.View entering={FadeInDown.delay(400).springify()} style={[styles.inputContainer, focusedField === "confirmPassword" && styles.inputContainerFocused]}>
+            <View style={[styles.inputIcon, focusedField === "confirmPassword" && styles.inputIconFocused]}>
+              <MaterialCommunityIcons name="lock-check-outline" size={20} color={focusedField === "confirmPassword" ? Colors.primary : Colors.gray400} />
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm Password"
+              placeholderTextColor={Colors.textTertiary}
+              value={formData.confirmPassword}
+              onChangeText={(v) => updateField("confirmPassword", v)}
+              secureTextEntry
+              editable={!isLoading}
+              onFocus={() => setFocusedField("confirmPassword")}
+              onBlur={() => setFocusedField(null)}
+            />
+          </Animated.View>
+
+          {/* Info Box */}
+          <Animated.View entering={FadeInDown.delay(450).springify()} style={styles.infoBox}>
+            <MaterialCommunityIcons name="information-outline" size={18} color={Colors.primary} />
+            <Text style={styles.infoText}>
+              {userType === "employer"
+                ? "You'll receive a unique code for employees to join your organization."
+                : "After signup, search for your employer and send a join request."}
+            </Text>
+          </Animated.View>
+
+          {/* Login Link */}
+          <Animated.View entering={FadeInDown.delay(500).springify()}>
+            <TouchableOpacity style={styles.loginLink} onPress={() => router.back()} disabled={isLoading}>
+              <Text style={styles.loginLinkText}>Already have an account?</Text>
+              <Text style={styles.loginLinkBold}>Sign In</Text>
+            </TouchableOpacity>
+          </Animated.View>
         </ScrollView>
+
+        {/* Bottom CTA */}
+        <SafeAreaView edges={["bottom"]} style={styles.bottomCTA}>
+          <Animated.View entering={FadeInDown.delay(550).springify()}>
+            <DepthButton
+              onPress={handleSignup}
+              disabled={isLoading}
+              loading={isLoading}
+              variant="primary"
+              size="lg"
+            >
+              {isLoading ? "Creating Account..." : "Create Account"}
+            </DepthButton>
+          </Animated.View>
+        </SafeAreaView>
       </KeyboardAvoidingView>
     </View>
   );
@@ -447,206 +311,196 @@ export default function SignupScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.gray50,
+    backgroundColor: Colors.background,
   },
-  headerGradient: {
-    paddingTop: Platform.OS === "ios" ? 60 : 50,
-    paddingBottom: 30,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
+  heroSection: {
+    borderBottomLeftRadius: BorderRadius["3xl"],
+    borderBottomRightRadius: BorderRadius["3xl"],
+  },
+  heroContent: {
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing["2xl"],
+    paddingHorizontal: Spacing.lg,
   },
   backButton: {
-    position: "absolute",
-    top: Platform.OS === "ios" ? 60 : 50,
-    left: 20,
-    zIndex: 10,
-    padding: 8,
-  },
-  logoSection: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.15)",
     alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.lg,
   },
-  logo: {
-    width: 80,
-    height: 80,
-    marginBottom: 8,
-  },
-  appName: {
-    fontSize: 20,
+  heroTitle: {
+    fontSize: Typography.fontSize["2xl"],
     fontWeight: "800",
     color: Colors.textInverse,
-    textShadowColor: "rgba(0, 0, 0, 0.2)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    letterSpacing: -0.5,
+  },
+  heroSubtitle: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: "500",
+    color: "rgba(255,255,255,0.85)",
+    marginTop: Spacing.xs,
   },
   formContainer: {
     flex: 1,
-    marginTop: -20,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.lg,
   },
-  card: {
-    backgroundColor: Colors.background,
-    borderRadius: 20,
-    padding: 28,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.04)",
-    ...Shadows.md,
+  roleSection: {
+    marginBottom: Spacing.lg,
   },
-  title: {
-    fontSize: 26,
-    fontWeight: "700",
-    textAlign: "center",
-    color: Colors.text,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 14,
-    textAlign: "center",
-    marginTop: 4,
-    marginBottom: 24,
-    color: Colors.textSecondary,
-  },
-  form: {
-    width: "100%",
-  },
-  typeSection: {
-    marginBottom: 20,
-  },
-  typeSectionTitle: {
-    fontSize: 15,
+  sectionLabel: {
+    fontSize: Typography.fontSize.sm,
     fontWeight: "600",
-    color: Colors.text,
-    marginBottom: 12,
-    textAlign: "center",
+    color: Colors.textSecondary,
+    marginBottom: Spacing.md,
   },
-  typeButtons: {
+  roleButtons: {
     flexDirection: "row",
-    gap: 12,
+    gap: Spacing.md,
   },
-  typeButton: {
+  roleButton: {
     flex: 1,
     backgroundColor: Colors.backgroundSecondary,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.md,
+    alignItems: "center",
     borderWidth: 1.5,
-    borderColor: "rgba(0,0,0,0.06)",
-    borderRadius: 16,
-    padding: 18,
+    borderColor: "transparent",
+  },
+  roleButtonActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primary + "08",
+  },
+  roleIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.gray100,
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    position: "relative",
-    minHeight: 130,
+    marginBottom: Spacing.sm,
   },
-  typeButtonActive: {
-    borderColor: Colors.primary,
-    backgroundColor: "rgba(255, 153, 51, 0.06)",
-    borderWidth: 2,
+  roleIconActive: {
+    backgroundColor: Colors.primary + "15",
   },
-  typeButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
+  roleTitle: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: "700",
     color: Colors.textSecondary,
-    textAlign: "center",
-    marginTop: 8,
   },
-  typeButtonTextActive: {
+  roleTitleActive: {
     color: Colors.primary,
   },
-  typeButtonSubtext: {
-    fontSize: 12,
-    color: Colors.gray400,
-    textAlign: "center",
-    marginTop: 4,
+  roleSubtitle: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textTertiary,
+    marginTop: 2,
   },
-  typeCheckmark: {
+  roleCheck: {
     position: "absolute",
-    top: 8,
-    right: 8,
+    top: Spacing.sm,
+    right: Spacing.sm,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: Spacing.lg,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  dividerText: {
+    paddingHorizontal: Spacing.md,
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textTertiary,
+    fontWeight: "500",
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "rgba(0,0,0,0.08)",
-    borderRadius: 14,
-    marginBottom: 16,
     backgroundColor: Colors.backgroundSecondary,
-    paddingHorizontal: 16,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: Spacing.md,
   },
   inputContainerFocused: {
     borderColor: Colors.primary,
     backgroundColor: Colors.background,
   },
   inputIcon: {
-    marginRight: 12,
+    width: 44,
+    height: 52,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inputIconFocused: {
+    backgroundColor: Colors.primary + "08",
+    borderTopLeftRadius: BorderRadius.xl - 1,
+    borderBottomLeftRadius: BorderRadius.xl - 1,
   },
   input: {
     flex: 1,
-    padding: 16,
-    paddingLeft: 0,
-    fontSize: 16,
+    paddingVertical: Spacing.md,
+    paddingRight: Spacing.md,
+    fontSize: Typography.fontSize.base,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
+  },
+  eyeButton: {
+    padding: Spacing.md,
   },
   infoBox: {
     flexDirection: "row",
-    backgroundColor: "rgba(255, 153, 51, 0.12)",
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 16,
-    gap: 12,
+    backgroundColor: Colors.primary + "08",
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    gap: Spacing.sm,
     alignItems: "flex-start",
-    borderWidth: 1,
-    borderColor: "rgba(255, 153, 51, 0.25)",
+    marginTop: Spacing.sm,
   },
   infoText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: Typography.fontSize.sm,
     color: Colors.primaryDark,
     lineHeight: 20,
   },
-  button: {
-    borderRadius: 14,
-    marginTop: 12,
-    overflow: "hidden",
-    ...Shadows.primary,
-  },
-  buttonGradient: {
-    padding: 18,
-    alignItems: "center",
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: Colors.textInverse,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  linkButton: {
-    padding: 8,
-    marginTop: 16,
-    alignItems: "center",
-  },
-  linkText: {
-    color: Colors.primary,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  dividerContainer: {
+  loginLink: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: 20,
+    justifyContent: "center",
+    gap: Spacing.xs,
+    paddingVertical: Spacing.lg,
   },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "rgba(0,0,0,0.06)",
+  loginLinkText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
   },
-  dividerText: {
-    marginHorizontal: 12,
-    fontSize: 11,
-    color: Colors.gray400,
-    fontWeight: "600",
+  loginLinkBold: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: "700",
+    color: Colors.primary,
+  },
+  bottomCTA: {
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    backgroundColor: Colors.background,
   },
 });

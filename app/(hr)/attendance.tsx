@@ -29,7 +29,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { Text } from "@/components/ui/Text";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, FontFamily } from '@/constants/theme';
 
 type StatusFilter = "all" | "present" | "absent" | "incomplete";
 type SortField = "name" | "checkIn" | "checkOut" | "hours";
@@ -845,6 +845,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: Typography.fontSize.sm,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
     height: 36,
     paddingVertical: 0,

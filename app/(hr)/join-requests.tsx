@@ -7,6 +7,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Modal,
+  Platform,
   TextInput,
   StatusBar,
   ScrollView,
@@ -24,7 +25,7 @@ import {
 } from '@/hooks/mutations/useEmployerMutations';
 import { EmployerEmployeeRequest } from '@/lib/types';
 import { formatDate, formatTime } from '@/lib/utils/date.utils';
-import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, FontFamily } from '@/constants/theme';
 import { Text } from '@/components/ui/Text';
 
 type StatusFilter = 'pending' | 'approved' | 'rejected' | 'all';
@@ -599,10 +600,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 3,
     borderColor: Colors.background,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: { elevation: 2 },
+    }),
   },
   cardHeaderContent: {
     flex: 1,
@@ -709,10 +715,15 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xl,
     backgroundColor: Colors.primary,
     gap: Spacing['sm'],
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: Colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+    }),
   },
   approveButtonText: {
     fontSize: Typography.fontSize.base,
@@ -814,6 +825,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     padding: Spacing['md'],
     fontSize: Typography.fontSize.base,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
     minHeight: 80,
     backgroundColor: Colors.background,

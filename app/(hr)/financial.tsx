@@ -16,7 +16,7 @@ import VoiceRecordingModal from '@/components/financial/VoiceRecordingModal';
 import VoiceConfirmationModal from '@/components/financial/VoiceConfirmationModal';
 import CashbookActionBar from '@/components/financial/CashbookActionBar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, FontFamily } from '@/constants/theme';
 import { useVoiceTransactionExtraction } from '@/hooks/voice/useVoiceTransactionExtraction';
 import { ExtractedTransactionData } from '@/constants/VoiceConfig';
 import { formatForTransactionForm } from '@/hooks/voice/useVoiceTransactionExtraction';
@@ -911,6 +911,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: Typography.fontSize.sm,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
     height: 36,
     paddingVertical: 0,

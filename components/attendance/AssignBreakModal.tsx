@@ -23,6 +23,7 @@ import {
   View,
 } from "react-native";
 import { useAlert } from "@/hooks/useAlert";
+import { FontFamily } from "@/constants/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface AssignBreakModalProps {
@@ -1018,6 +1019,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 14,
+    fontFamily: FontFamily.regular,
     color: "#0F172A",
   },
   textAreaWrapper: {
@@ -1081,11 +1083,15 @@ const styles = StyleSheet.create({
   },
   assignFooterButton: {
     backgroundColor: "#F59E0B",
-    shadowColor: "#F59E0B",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#F59E0B",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+    }),
   },
   assignFooterButtonDisabled: {
     opacity: 0.5,

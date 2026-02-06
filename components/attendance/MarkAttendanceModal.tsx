@@ -34,7 +34,7 @@ import {
   View,
 } from "react-native";
 import { Text } from "@/components/ui/Text";
-import { Colors, Spacing, BorderRadius, Shadows, StatusColors } from "@/constants/theme";
+import { Colors, Spacing, BorderRadius, Shadows, StatusColors, FontFamily } from "@/constants/theme";
 import { useAlert } from "@/hooks/useAlert";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -1202,6 +1202,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 15,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
   },
   textAreaWrapper: {
@@ -1257,6 +1258,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 14,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
   },
   dropdownList: {
@@ -1286,11 +1288,15 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     marginTop: Spacing.sm,
     gap: Spacing.sm,
-    shadowColor: Colors.indigo,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: Colors.indigo,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+    }),
   },
   submitButtonDisabled: {
     opacity: 0.6,
@@ -1309,11 +1315,15 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     marginTop: Spacing.md,
     gap: Spacing.sm,
-    shadowColor: Colors.error,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: Colors.error,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+    }),
   },
   deleteButtonDisabled: {
     opacity: 0.6,

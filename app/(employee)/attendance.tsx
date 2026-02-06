@@ -1,13 +1,17 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, StatusBar, RefreshControl } from 'react-native';
 import { useAlert } from '@/hooks/useAlert';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { Text } from '@/components/ui/Text';
 import { LinearGradient } from 'expo-linear-gradient';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, { FadeIn, FadeOut, FadeInUp } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/hooks/auth/useAuth';
 import { useAttendanceByYearMonth, useFirstAttendanceDate } from '@/hooks/queries/useAttendance';
 import { useUserAttendanceSummary } from '@/hooks/queries/useAttendanceSummary';
 import { useMyOvertimeRequests } from '@/hooks/queries/useOvertimeRequests';
+import { useUserLeaveRequests } from '@/hooks/queries/useLeave';
 import { formatTime } from '@/lib/utils/date.utils';
 import { formatHours } from '@/lib/utils/attendance.utils';
 import { downloadAttendanceReport } from '@/lib/utils/attendanceSheet.utils';
@@ -16,6 +20,11 @@ import { Colors, Typography, Spacing, BorderRadius, StatusColors } from '@/const
 import AddOvertimeModal from '@/components/attendance/AddOvertimeModal';
 import YearMonthSelector from '@/components/ui/YearMonthSelector';
 import EnhancedAttendanceStats from '@/components/attendance/EnhancedAttendanceStats';
+import AttendanceViewToggle, { ViewMode } from '@/components/attendance/AttendanceViewToggle';
+import AttendanceCalendarView, { CalendarDay } from '@/components/attendance/AttendanceCalendarView';
+import DayDetailModal from '@/components/attendance/DayDetailModal';
+import WeeklyHoursChart from '@/components/attendance/WeeklyHoursChart';
+import SwipeableAttendanceRow from '@/components/attendance/SwipeableAttendanceRow';
 
 export default function AttendanceScreen() {
   const { user } = useAuth();
@@ -30,6 +39,9 @@ export default function AttendanceScreen() {
   const [showOvertimeModal, setShowOvertimeModal] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
   const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [selectedCalendarDay, setSelectedCalendarDay] = useState<CalendarDay | null>(null);
+  const [showDayDetailModal, setShowDayDetailModal] = useState(false);
 
   // Get first attendance date to determine year range
   const { data: firstAttendanceDate } = useFirstAttendanceDate(userId);
@@ -49,6 +61,9 @@ export default function AttendanceScreen() {
     isLoading: isSummaryLoading,
     refetch: refetchSummary
   } = useUserAttendanceSummary(userId, selectedYear, selectedMonth);
+
+  // Fetch leave requests for calendar
+  const { data: leaveRequests } = useUserLeaveRequests(userId);
 
   // Calculate date range for overtime requests (also used as filter param)
   const overtimeFilters = useMemo(() => {
@@ -75,9 +90,9 @@ export default function AttendanceScreen() {
   );
 
   // Helper to get overtime request for a specific attendance record
-  const getOvertimeRequest = (attendanceRecordId: string) => {
+  const getOvertimeRequest = useCallback((attendanceRecordId: string) => {
     return overtimeRequests?.find(req => req.attendance_record_id === attendanceRecordId);
-  };
+  }, [overtimeRequests]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -130,188 +145,45 @@ export default function AttendanceScreen() {
   };
 
   const isCurrentMonth = selectedYear === currentDate.getFullYear() && selectedMonth === currentDate.getMonth();
+  const isSpecificMonth = selectedYear !== 'all' && selectedMonth !== 'all';
 
   const toggleExpand = (recordId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setExpandedRecordId(prev => prev === recordId ? null : recordId);
   };
 
-  const renderTableRow = ({ item }: { item: AttendanceRecord }) => {
-    const isExpanded = expandedRecordId === item.id;
+  const handleViewChange = (view: ViewMode) => {
+    setViewMode(view);
+  };
+
+  const handleDayPress = (day: CalendarDay) => {
+    if (!day.isCurrentMonth || day.isFuture) return;
+    setSelectedCalendarDay(day);
+    setShowDayDetailModal(true);
+  };
+
+  const handleRequestOvertimeFromCalendar = (record: AttendanceRecord) => {
+    setSelectedRecord(record);
+    setShowOvertimeModal(true);
+  };
+
+  const renderTableRow = useCallback(({ item, index }: { item: AttendanceRecord; index: number }) => {
     const overtimeRequest = getOvertimeRequest(item.id);
 
-    const date = new Date(item.date);
-    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
-
-    const hasOvertimeContent = (item.overtime_hours || 0) > 0 || overtimeRequest;
-    const hasExpandableContent = item.notes || hasOvertimeContent || (item.check_in_time && item.check_out_time);
-
     return (
-      <View style={styles.tableRowWrapper}>
-        <TouchableOpacity
-          style={[styles.tableRow, isExpanded && styles.tableRowExpanded]}
-          onPress={() => hasExpandableContent && toggleExpand(item.id)}
-          activeOpacity={hasExpandableContent ? 0.7 : 1}
-          accessibilityLabel={`${dateStr} ${weekday}, Check in ${item.check_in_time ? formatTime(new Date(item.check_in_time)) : 'not recorded'}, Check out ${item.check_out_time ? formatTime(new Date(item.check_out_time)) : 'not recorded'}${hasExpandableContent ? ', tap to expand details' : ''}`}
-          accessibilityRole="button"
-          accessibilityState={{ expanded: isExpanded }}
-        >
-          {/* Date */}
-          <View style={styles.tableCellDate}>
-            <Text style={styles.tableCellDateText}>{dateStr}</Text>
-            <Text style={styles.tableCellWeekday}>{weekday}</Text>
-          </View>
-
-          {/* Check-in */}
-          <View style={styles.tableCellTime}>
-            <Text style={styles.tableCellTimeText}>
-              {item.check_in_time ? formatTime(new Date(item.check_in_time)) : '--:--'}
-            </Text>
-          </View>
-
-          {/* Check-out */}
-          <View style={styles.tableCellTime}>
-            <Text style={styles.tableCellTimeText}>
-              {item.check_out_time ? formatTime(new Date(item.check_out_time)) : '--:--'}
-            </Text>
-          </View>
-
-          {/* Hours */}
-          <View style={styles.tableCellHours}>
-            <Text style={styles.tableCellHoursText}>
-              {item.total_hours
-                ? formatHours(item.total_hours - (item.overtime_hours || 0))
-                : '--'}
-            </Text>
-          </View>
-
-          {/* OT */}
-          <View style={styles.tableCellOT}>
-            {(item.overtime_hours || 0) > 0 ? (
-              <Text style={styles.tableCellOTText}>{formatHours(item.overtime_hours || 0)}</Text>
-            ) : overtimeRequest?.status === 'pending' ? (
-              <View style={styles.otPendingDot} />
-            ) : item.check_in_time && item.check_out_time && !overtimeRequest ? (
-              <TouchableOpacity
-                onPress={(e) => {
-                  e.stopPropagation();
-                  setSelectedRecord(item);
-                  setShowOvertimeModal(true);
-                }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityLabel={`Add overtime for ${dateStr}`}
-                accessibilityRole="button"
-              >
-                <Ionicons name="add-circle-outline" size={18} color={Colors.purple} />
-              </TouchableOpacity>
-            ) : (
-              <Text style={styles.tableCellOTEmpty}>--</Text>
-            )}
-          </View>
-
-          {/* Expand indicator */}
-          {hasExpandableContent && (
-            <View style={styles.expandIndicator}>
-              <Ionicons
-                name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                size={16}
-                color={Colors.gray400}
-              />
-            </View>
-          )}
-        </TouchableOpacity>
-
-        {/* Expanded Content */}
-        {isExpanded && (
-          <View style={styles.expandedContent}>
-            {/* Notes Section */}
-            {item.notes && (
-              <View style={styles.expandedSection}>
-                <View style={styles.expandedSectionHeader}>
-                  <Feather name="file-text" size={14} color={Colors.gray500} />
-                  <Text style={styles.expandedSectionLabel}>Notes</Text>
-                </View>
-                <Text style={styles.expandedNotesText}>{item.notes}</Text>
-              </View>
-            )}
-
-            {/* Overtime Section */}
-            {item.check_in_time && item.check_out_time && (() => {
-              if (overtimeRequest?.status === 'pending') {
-                return (
-                  <View style={styles.expandedOvertimePending}>
-                    <View style={styles.expandedOvertimeHeader}>
-                      <View style={styles.pulseDotOrange} />
-                      <Text style={styles.expandedOvertimePendingLabel}>Waiting for Approval</Text>
-                    </View>
-                    <View style={styles.expandedOvertimeRow}>
-                      <MaterialCommunityIcons name="clock-plus-outline" size={16} color={Colors.warning} />
-                      <Text style={styles.expandedOvertimePendingHours}>
-                        {formatHours(overtimeRequest.requested_hours)} requested
-                      </Text>
-                    </View>
-                    {overtimeRequest.reason && (
-                      <Text style={styles.expandedOvertimeReason}>{overtimeRequest.reason}</Text>
-                    )}
-                  </View>
-                );
-              }
-
-              if (overtimeRequest?.status === 'rejected') {
-                return (
-                  <View style={styles.expandedOvertimeRejected}>
-                    <View style={styles.expandedOvertimeHeader}>
-                      <Ionicons name="close-circle" size={14} color={Colors.error} />
-                      <Text style={styles.expandedOvertimeRejectedLabel}>Request Rejected</Text>
-                    </View>
-                    <Text style={styles.expandedOvertimeRejectedHours}>
-                      {formatHours(overtimeRequest.requested_hours)} was requested
-                    </Text>
-                    {overtimeRequest.reviewer_notes && (
-                      <Text style={styles.expandedOvertimeRejectedNote}>
-                        Note: {overtimeRequest.reviewer_notes}
-                      </Text>
-                    )}
-                  </View>
-                );
-              }
-
-              if ((item.overtime_hours || 0) > 0) {
-                return (
-                  <View style={styles.expandedOvertimeApproved}>
-                    <View style={styles.expandedOvertimeHeader}>
-                      <MaterialCommunityIcons name="clock-plus-outline" size={14} color={Colors.purple} />
-                      <Text style={styles.expandedOvertimeApprovedLabel}>Overtime Approved</Text>
-                    </View>
-                    <Text style={styles.expandedOvertimeApprovedHours}>
-                      {formatHours(item.overtime_hours || 0)}
-                    </Text>
-                    {item.overtime_reason && (
-                      <Text style={styles.expandedOvertimeApprovedReason}>{item.overtime_reason}</Text>
-                    )}
-                  </View>
-                );
-              }
-
-              return (
-                <TouchableOpacity
-                  style={styles.expandedAddOvertimeButton}
-                  onPress={() => {
-                    setSelectedRecord(item);
-                    setShowOvertimeModal(true);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <MaterialCommunityIcons name="clock-plus-outline" size={16} color={Colors.purple} />
-                  <Text style={styles.expandedAddOvertimeText}>Request Overtime</Text>
-                </TouchableOpacity>
-              );
-            })()}
-          </View>
-        )}
-      </View>
+      <SwipeableAttendanceRow
+        item={item}
+        index={index}
+        isExpanded={expandedRecordId === item.id}
+        overtimeRequest={overtimeRequest}
+        onToggleExpand={() => toggleExpand(item.id)}
+        onRequestOvertime={() => {
+          setSelectedRecord(item);
+          setShowOvertimeModal(true);
+        }}
+      />
     );
-  };
+  }, [expandedRecordId, getOvertimeRequest]);
 
   const TableHeader = () => (
     <View style={styles.tableHeader} accessibilityRole="header">
@@ -355,6 +227,26 @@ export default function AttendanceScreen() {
         </View>
       </LinearGradient>
 
+      {/* View Toggle */}
+      {isSpecificMonth && (
+        <AttendanceViewToggle
+          activeView={viewMode}
+          onViewChange={handleViewChange}
+          tableRecordsCount={records.length}
+        />
+      )}
+
+      {/* Hours Progress Section - Only show for specific month in table view */}
+      {isSpecificMonth && viewMode === 'table' && (
+        <View style={styles.hoursProgressSection}>
+          <WeeklyHoursChart
+            records={records}
+            expectedHoursPerDay={user?.daily_working_hours || 8}
+            isLoading={isLoading}
+          />
+        </View>
+      )}
+
       {/* Enhanced Stats Section */}
       <View style={styles.statsSection}>
         <EnhancedAttendanceStats
@@ -366,70 +258,92 @@ export default function AttendanceScreen() {
           overtimeHours={summary?.approvedOvertimeHours || 0}
           attendancePercentage={summary?.attendancePercentage}
           isLoading={isSummaryLoading}
+          animate={true}
         />
       </View>
 
-      {/* Download Report Section */}
-      <View style={styles.modernSection}>
-        <View style={styles.modernSectionHeader}>
-          <Text style={styles.modernSectionTitle}>Monthly Report</Text>
-        </View>
+      {/* Calendar View */}
+      {viewMode === 'calendar' && isSpecificMonth && (
+        <Animated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(200)}>
+          <AttendanceCalendarView
+            year={selectedYear as number}
+            month={selectedMonth as number}
+            records={records}
+            leaves={leaveRequests?.filter(l => l.status === 'approved')}
+            onDayPress={handleDayPress}
+            isLoading={isLoading}
+          />
+        </Animated.View>
+      )}
 
-        <View style={styles.groupedList}>
-          <View style={styles.reportHeader}>
-            <View style={styles.reportHeaderLeft}>
-              <Ionicons name="document-text-outline" size={20} color={Colors.primary} />
-              <Text style={styles.reportTitle}>Attendance Report</Text>
+      {/* Download Report Section */}
+      {viewMode === 'table' && (
+        <View style={styles.modernSection}>
+          <View style={styles.modernSectionHeader}>
+            <Text style={styles.modernSectionTitle}>Monthly Report</Text>
+          </View>
+
+          <View style={styles.groupedList}>
+            <View style={styles.reportHeader}>
+              <View style={styles.reportHeaderLeft}>
+                <Ionicons name="document-text-outline" size={20} color={Colors.primary} />
+                <Text style={styles.reportTitle}>Attendance Report</Text>
+              </View>
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.reportContent}>
+              <Text style={styles.reportHint}>
+                {selectedYear === 'all' || selectedMonth === 'all'
+                  ? 'Select a specific month to download the report'
+                  : isCurrentMonth
+                    ? `Download attendance report for ${getDisplayMonthText()} up to today`
+                    : 'Download complete attendance report with salary details'
+                }
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.downloadButton,
+                  (!records || records.length === 0 || selectedYear === 'all' || selectedMonth === 'all') && styles.downloadButtonDisabled
+                ]}
+                onPress={handleDownloadReport}
+                disabled={!records || records.length === 0 || downloading || selectedYear === 'all' || selectedMonth === 'all'}
+                activeOpacity={0.7}
+                accessibilityLabel={downloading ? "Downloading report" : "Download PDF attendance report"}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !records || records.length === 0 || downloading || selectedYear === 'all' || selectedMonth === 'all' }}
+              >
+                {downloading ? (
+                  <ActivityIndicator size="small" color={Colors.textInverse} />
+                ) : (
+                  <>
+                    <Ionicons name="download-outline" size={20} color={Colors.textInverse} />
+                    <Text style={styles.downloadButtonText}>Download PDF Report</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
-          <View style={styles.divider} />
-          <View style={styles.reportContent}>
-            <Text style={styles.reportHint}>
-              {selectedYear === 'all' || selectedMonth === 'all'
-                ? 'Select a specific month to download the report'
-                : isCurrentMonth
-                  ? `Download attendance report for ${getDisplayMonthText()} up to today`
-                  : 'Download complete attendance report with salary details'
-              }
-            </Text>
-            <TouchableOpacity
-              style={[
-                styles.downloadButton,
-                (!records || records.length === 0 || selectedYear === 'all' || selectedMonth === 'all') && styles.downloadButtonDisabled
-              ]}
-              onPress={handleDownloadReport}
-              disabled={!records || records.length === 0 || downloading || selectedYear === 'all' || selectedMonth === 'all'}
-              activeOpacity={0.7}
-              accessibilityLabel={downloading ? "Downloading report" : "Download PDF attendance report"}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: !records || records.length === 0 || downloading || selectedYear === 'all' || selectedMonth === 'all' }}
-            >
-              {downloading ? (
-                <ActivityIndicator size="small" color={Colors.textInverse} />
-              ) : (
-                <>
-                  <Ionicons name="download-outline" size={20} color={Colors.textInverse} />
-                  <Text style={styles.downloadButtonText}>Download PDF Report</Text>
-                </>
-              )}
-            </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Attendance Records Section - Table View Only */}
+      {viewMode === 'table' && (
+        <>
+          <View style={styles.modernSection}>
+            <View style={styles.modernSectionHeader}>
+              <Text style={styles.modernSectionTitle}>Attendance Records</Text>
+              <Text style={styles.recordsCount}>{records.length} records</Text>
+            </View>
+            <Text style={styles.swipeHint}>Swipe left on a row to request overtime</Text>
           </View>
-        </View>
-      </View>
 
-      {/* Attendance Records Section */}
-      <View style={styles.modernSection}>
-        <View style={styles.modernSectionHeader}>
-          <Text style={styles.modernSectionTitle}>Attendance Records</Text>
-          <Text style={styles.recordsCount}>{records.length} records</Text>
-        </View>
-      </View>
-
-      {/* Table Container with Header */}
-      {records.length > 0 && (
-        <View style={styles.tableContainer}>
-          <TableHeader />
-        </View>
+          {/* Table Container with Header */}
+          {records.length > 0 && (
+            <View style={styles.tableContainer}>
+              <TableHeader />
+            </View>
+          )}
+        </>
       )}
     </>
   );
@@ -443,11 +357,11 @@ export default function AttendanceScreen() {
   );
 
   const ListFooter = () => (
-    records.length > 0 ? <View style={styles.tableFooter} /> : null
+    records.length > 0 && viewMode === 'table' ? <View style={styles.tableFooter} /> : null
   );
 
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       {isLoading ? (
@@ -457,6 +371,23 @@ export default function AttendanceScreen() {
             <ActivityIndicator size="large" color={Colors.indigo} />
           </View>
         </>
+      ) : viewMode === 'calendar' ? (
+        // Calendar view: use ScrollView instead of FlatList
+        <FlatList
+          data={[]}
+          renderItem={() => null}
+          ListHeaderComponent={ListHeader}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[Colors.indigo]}
+              tintColor={Colors.indigo}
+            />
+          }
+        />
       ) : (
         <FlatList
           data={records}
@@ -490,7 +421,19 @@ export default function AttendanceScreen() {
           attendanceRecord={selectedRecord}
         />
       )}
-    </View>
+
+      {/* Day Detail Modal */}
+      <DayDetailModal
+        visible={showDayDetailModal}
+        onClose={() => {
+          setShowDayDetailModal(false);
+          setSelectedCalendarDay(null);
+        }}
+        day={selectedCalendarDay}
+        overtimeRequest={selectedCalendarDay?.record ? getOvertimeRequest(selectedCalendarDay.record.id) : undefined}
+        onRequestOvertime={handleRequestOvertimeFromCalendar}
+      />
+    </GestureHandlerRootView>
   );
 }
 
@@ -515,6 +458,10 @@ const styles = StyleSheet.create({
   },
   selectorWrapper: {
     marginTop: Spacing['xs'],
+  },
+  hoursProgressSection: {
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.md,
   },
   statsSection: {
     paddingTop: Spacing['lg'],
@@ -542,6 +489,11 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.sm,
     color: Colors.textSecondary,
   },
+  swipeHint: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.textTertiary,
+    fontStyle: 'italic',
+  },
   // Table Styles
   tableContainer: {
     marginHorizontal: Spacing.xl,
@@ -568,23 +520,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
-  tableRowWrapper: {
-    marginHorizontal: Spacing.xl,
-    backgroundColor: Colors.backgroundSecondary,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: Colors.border,
-  },
-  tableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.backgroundSecondary,
-  },
-  tableRowExpanded: {
-    backgroundColor: Colors.backgroundSecondary,
-  },
   tableRowSeparator: {
     marginHorizontal: Spacing.xl,
     height: StyleSheet.hairlineWidth,
@@ -594,52 +529,17 @@ const styles = StyleSheet.create({
     width: 65,
     paddingRight: 4,
   },
-  tableCellDateText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  tableCellWeekday: {
-    fontSize: 9,
-    color: Colors.gray400,
-    marginTop: 1,
-  },
   tableCellTime: {
     flex: 1,
     alignItems: 'center',
-  },
-  tableCellTimeText: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: Colors.gray700,
   },
   tableCellHours: {
     flex: 1,
     alignItems: 'center',
   },
-  tableCellHoursText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.indigo,
-  },
   tableCellOT: {
     width: 40,
     alignItems: 'center',
-  },
-  tableCellOTText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: Colors.purple,
-  },
-  tableCellOTEmpty: {
-    fontSize: 10,
-    color: Colors.gray300,
-  },
-  otPendingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.warning,
   },
   expandIndicator: {
     width: 16,
@@ -655,143 +555,6 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderBottomLeftRadius: BorderRadius.xl,
     borderBottomRightRadius: BorderRadius.xl,
-  },
-  expandedContent: {
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.md,
-    backgroundColor: Colors.backgroundSecondary,
-    gap: Spacing.sm,
-  },
-  expandedSection: {
-    backgroundColor: Colors.background,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-  },
-  expandedSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: Spacing.xs,
-  },
-  expandedSectionLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  expandedNotesText: {
-    fontSize: 13,
-    color: Colors.text,
-    lineHeight: 18,
-  },
-  // Expanded Overtime Styles
-  expandedOvertimePending: {
-    backgroundColor: StatusColors.pending.background,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: StatusColors.pending.border,
-  },
-  expandedOvertimeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: Spacing.xs,
-  },
-  pulseDotOrange: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.warning,
-  },
-  expandedOvertimePendingLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: StatusColors.pending.text,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  expandedOvertimeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  expandedOvertimePendingHours: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: StatusColors.pending.text,
-  },
-  expandedOvertimeReason: {
-    fontSize: 12,
-    color: Colors.warningDark,
-    marginTop: 4,
-  },
-  expandedOvertimeRejected: {
-    backgroundColor: StatusColors.rejected.background,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: StatusColors.rejected.border,
-  },
-  expandedOvertimeRejectedLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: StatusColors.rejected.text,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  expandedOvertimeRejectedHours: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: StatusColors.rejected.text,
-  },
-  expandedOvertimeRejectedNote: {
-    fontSize: 12,
-    color: Colors.errorDark,
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
-  expandedOvertimeApproved: {
-    backgroundColor: Colors.purpleLight,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: StatusColors.overtime.border,
-  },
-  expandedOvertimeApprovedLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.purple,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  expandedOvertimeApprovedHours: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: StatusColors.overtime.text,
-    marginTop: 2,
-  },
-  expandedOvertimeApprovedReason: {
-    fontSize: 12,
-    color: Colors.purple,
-    marginTop: 4,
-  },
-  expandedAddOvertimeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    backgroundColor: Colors.purpleLight,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: StatusColors.overtime.border,
-  },
-  expandedAddOvertimeText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.purple,
   },
   loadingContainer: {
     flex: 1,

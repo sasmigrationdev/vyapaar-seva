@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TextInput, TouchableOpacity, Platform } from 'react-native';
 import { useAlert } from '@/hooks/useAlert';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Text } from '@/components/ui/Text';
 import { AttendanceBreak } from '@/lib/types';
 import TimePicker from '@/components/ui/TimePicker';
 import { calculateBreakDuration } from '@/lib/utils/attendance.utils';
+import { FontFamily } from '@/constants/theme';
 
 interface BreakInputProps {
   date: string; // Date for the break (YYYY-MM-DD)
@@ -272,6 +273,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 14,
+    fontFamily: FontFamily.regular,
     color: '#0F172A',
   },
   textAreaWrapper: {
@@ -331,11 +333,15 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     backgroundColor: '#6366F1',
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+      },
+      android: { elevation: 3 },
+    }),
   },
   saveButtonText: {
     fontSize: 14,

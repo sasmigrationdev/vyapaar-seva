@@ -25,6 +25,7 @@ import {
   Shadows,
   StatusColors,
   Typography,
+  FontFamily,
 } from '@/constants/theme';
 
 interface BreakRequestModalProps {
@@ -439,6 +440,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: Typography.fontSize.sm,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
   },
   textAreaWrapper: {
@@ -543,11 +545,15 @@ const styles = StyleSheet.create({
   },
   submitFooterButton: {
     backgroundColor: Colors.indigo,
-    shadowColor: Colors.indigo,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: Colors.indigo,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+    }),
   },
   submitFooterButtonDisabled: {
     opacity: 0.5,

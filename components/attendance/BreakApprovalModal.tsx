@@ -21,6 +21,7 @@ import {
 import { useAuth } from '@/hooks/auth/useAuth';
 import { formatTime, formatDate } from '@/lib/utils/date.utils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FontFamily } from '@/constants/theme';
 
 interface BreakApprovalModalProps {
   visible: boolean;
@@ -469,6 +470,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 14,
+    fontFamily: FontFamily.regular,
     color: '#0F172A',
   },
   textAreaWrapper: {
@@ -532,11 +534,15 @@ const styles = StyleSheet.create({
   },
   approveButton: {
     backgroundColor: '#10B981',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#10B981',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+    }),
   },
   approveButtonDisabled: {
     opacity: 0.5,

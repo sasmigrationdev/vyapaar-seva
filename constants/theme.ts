@@ -246,6 +246,20 @@ export const Typography = {
     textTransform: "uppercase" as const,
     letterSpacing: 0.5,
   },
+
+  // Input text style - use for TextInput components
+  // Android ignores fontWeight on TextInput, so we must use fontFamily
+  inputText: {
+    fontFamily: "FunnelSans_400Regular",
+    fontSize: 16,
+    color: Colors.text,
+  },
+
+  inputTextMedium: {
+    fontFamily: "FunnelSans_500Medium",
+    fontSize: 16,
+    color: Colors.text,
+  },
 };
 
 // Spacing Scale
@@ -326,13 +340,16 @@ export const Shadows = {
     elevation: 2,
   },
   // Colored shadow for primary buttons
-  primary: {
-    shadowColor: "#FF9933",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
+  primary: Platform.select({
+    ios: {
+      shadowColor: "#FF9933",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+    },
+    android: { elevation: 4 },
+    default: { elevation: 4 },
+  }),
   // Inner glow effect
   inner: {
     shadowColor: "#000",
@@ -519,11 +536,16 @@ export const ButtonStyles = {
     borderRadius: BorderRadius.lg,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.xl,
-    shadowColor: Colors.success,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: Colors.success,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+      default: { elevation: 4 },
+    }),
   },
 
   // Danger button - destructive actions

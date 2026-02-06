@@ -9,7 +9,7 @@ import { BorderRadius, Colors, Shadows, Spacing } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
-import { Dimensions, Image, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Dimensions, FlatList, Image, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -299,7 +299,7 @@ export function MarketingBannerCarousel({
 
   return (
     <View style={carouselStyles.container}>
-      <Animated.FlatList
+      <FlatList
         ref={flatListRef}
         data={banners}
         horizontal
@@ -312,7 +312,7 @@ export function MarketingBannerCarousel({
         snapToAlignment="center"
         contentContainerStyle={carouselStyles.listContent}
         keyExtractor={(_, index) => `banner-${index}`}
-        renderItem={({ item, index }) => (
+        renderItem={({ item }) => (
           <View style={[carouselStyles.bannerItem, { width: bannerWidth }]}>
             <MarketingBanner {...item} />
           </View>
@@ -431,12 +431,20 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   backgroundImage: {
-    ...StyleSheet.absoluteFillObject,
-    width: "100%",
-    height: "100%",
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   imageOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   contentOverlay: {
     flex: 1,

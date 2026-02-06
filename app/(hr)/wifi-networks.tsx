@@ -21,7 +21,7 @@ import {
 } from "react-native";
 import { useAlert } from "@/hooks/useAlert";
 import { Text } from "@/components/ui/Text";
-import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, FontFamily } from '@/constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatDate } from '@/lib/utils/date.utils';
 
@@ -627,6 +627,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing['md'],
     paddingVertical: Spacing['md'],
     fontSize: Typography.fontSize.base,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
     backgroundColor: Colors.background,
   },

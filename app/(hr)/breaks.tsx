@@ -31,7 +31,7 @@ import {
   BreaksActionBar,
   BreakRecordCard,
 } from "@/components/breaks";
-import { Colors, Typography, Spacing, BorderRadius } from "@/constants/theme";
+import { Colors, Typography, Spacing, BorderRadius, FontFamily } from "@/constants/theme";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -588,6 +588,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 14,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
   },
   loadingContainer: {

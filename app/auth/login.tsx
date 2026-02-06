@@ -9,19 +9,19 @@ import {
   StatusBar,
   Image,
   ScrollView,
-  Dimensions,
 } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useAlert } from "@/hooks/useAlert";
 import { LinearGradient } from "expo-linear-gradient";
 import { Text } from "@/components/ui/Text";
+import { DepthButton } from "@/components/ui/DepthButton";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
-import { Link, router } from "expo-router";
+import { Link } from "expo-router";
 import { useSignIn } from "@/hooks/mutations/useAuthMutations";
-import { Colors, BorderRadius, Shadows, Spacing, Gradients } from "@/constants/theme";
+import { Colors, BorderRadius, Gradients, Typography, Spacing, FontFamily } from "@/constants/theme";
 import { GoogleSignInButton } from "@/components/ui/GoogleSignInButton";
 import { IS_GOOGLE_CONFIGURED } from "@/hooks/auth/useGoogleAuth";
-
-const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -32,9 +32,7 @@ export default function LoginScreen() {
   const { error } = useAlert();
 
   const signInMutation = useSignIn({
-    onSuccess: () => {
-      // Navigation is handled by root layout based on user role
-    },
+    onSuccess: () => {},
     onError: (err) => {
       error("Login Failed", err.message);
     },
@@ -45,7 +43,6 @@ export default function LoginScreen() {
       error("Error", "Please fill in all fields");
       return;
     }
-
     signInMutation.mutate({ email, password });
   };
 
@@ -53,163 +50,116 @@ export default function LoginScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Gradient Header */}
-      <LinearGradient
-        colors={Gradients.saffronHero}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.headerGradient}
-      >
-        <View style={styles.logoSection}>
-          <Image
-            source={require("@/assets/images/logovs.png")}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+      {/* Hero Section */}
+      <LinearGradient colors={Gradients.saffronHero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroSection}>
+        <SafeAreaView edges={["top"]} style={styles.heroContent}>
+          <View style={styles.logoWrapper}>
+            <Image source={require("@/assets/images/logovs.png")} style={styles.logo} resizeMode="contain" />
+          </View>
           <Text style={styles.appName}>VYAPAAR SEWA</Text>
           <Text style={styles.tagline}>Attendance & Salary Management</Text>
-        </View>
+        </SafeAreaView>
       </LinearGradient>
 
-      {/* Form Card */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.formContainer}
-      >
+      {/* Form */}
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.formContainer}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.card}>
-            <Text style={styles.welcomeText}>Welcome Back</Text>
-            <Text style={styles.instructionText}>Sign in to continue</Text>
+          <Animated.View entering={FadeInDown.delay(100).springify()}>
+            <Text style={styles.title}>Welcome Back</Text>
+            <Text style={styles.subtitle}>Sign in to continue</Text>
+          </Animated.View>
 
-            <View style={styles.form}>
-              <View style={[styles.inputContainer, emailFocused && styles.inputContainerFocused]}>
-                <MaterialCommunityIcons
-                  name="email-outline"
-                  size={20}
-                  color={emailFocused ? Colors.primary : Colors.gray400}
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email"
-                  placeholderTextColor={Colors.gray400}
-                  value={email}
-                  onChangeText={setEmail}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  editable={!signInMutation.isPending}
-                  onFocus={() => setEmailFocused(true)}
-                  onBlur={() => setEmailFocused(false)}
-                  accessibilityLabel="Email address"
-                  accessibilityHint="Enter your email address to sign in"
-                />
-              </View>
-
-              <View style={[styles.inputContainer, passwordFocused && styles.inputContainerFocused]}>
-                <MaterialCommunityIcons
-                  name="lock-outline"
-                  size={20}
-                  color={passwordFocused ? Colors.primary : Colors.gray400}
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Password"
-                  placeholderTextColor={Colors.gray400}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                  editable={!signInMutation.isPending}
-                  onFocus={() => setPasswordFocused(true)}
-                  onBlur={() => setPasswordFocused(false)}
-                  accessibilityLabel="Password"
-                  accessibilityHint="Enter your password to sign in"
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  style={styles.eyeButton}
-                  accessibilityLabel={showPassword ? "Hide password" : "Show password"}
-                  accessibilityRole="button"
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons
-                    name={showPassword ? "eye-off-outline" : "eye-outline"}
-                    size={20}
-                    color={Colors.gray400}
-                  />
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity
-                style={[styles.button, signInMutation.isPending && styles.buttonDisabled]}
-                onPress={handleLogin}
-                disabled={signInMutation.isPending}
-                accessibilityLabel={signInMutation.isPending ? "Logging in, please wait" : "Login"}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: signInMutation.isPending }}
-              >
-                <LinearGradient
-                  colors={[Colors.primary, Colors.primaryDark]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.buttonGradient}
-                >
-                  <Text style={styles.buttonText}>
-                    {signInMutation.isPending ? "Logging in..." : "Login"}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-
-              <Link href="/auth/forgot-password" asChild>
-                <TouchableOpacity
-                  style={styles.linkButton}
-                  accessibilityLabel="Forgot Password"
-                  accessibilityRole="link"
-                  accessibilityHint="Navigate to password reset page"
-                >
-                  <Text style={styles.linkText}>Forgot Password?</Text>
-                </TouchableOpacity>
-              </Link>
-
-              {IS_GOOGLE_CONFIGURED && (
-                <>
-                  <View style={styles.dividerContainer}>
-                    <View style={styles.divider} />
-                    <Text style={styles.dividerText}>OR</Text>
-                    <View style={styles.divider} />
-                  </View>
-
-                  <GoogleSignInButton
-                    onError={(err) => error("Google Sign-In Failed", err)}
-                    disabled={signInMutation.isPending}
-                  />
-
-                  <View style={styles.spacer} />
-                </>
-              )}
-
-              <Link href="/auth/signup" asChild>
-                <TouchableOpacity
-                  style={styles.secondaryButton}
-                  accessibilityLabel="Create New Account"
-                  accessibilityRole="link"
-                  accessibilityHint="Navigate to signup page to create a new account"
-                >
-                  <MaterialCommunityIcons
-                    name="account-plus-outline"
-                    size={20}
-                    color={Colors.primary}
-                  />
-                  <Text style={styles.secondaryButtonText}>Create New Account</Text>
-                </TouchableOpacity>
-              </Link>
+          {/* Email */}
+          <Animated.View entering={FadeInDown.delay(150).springify()} style={[styles.inputContainer, emailFocused && styles.inputContainerFocused]}>
+            <View style={[styles.inputIcon, emailFocused && styles.inputIconFocused]}>
+              <MaterialCommunityIcons name="email-outline" size={20} color={emailFocused ? Colors.primary : Colors.gray400} />
             </View>
-          </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor={Colors.textTertiary}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              editable={!signInMutation.isPending}
+              onFocus={() => setEmailFocused(true)}
+              onBlur={() => setEmailFocused(false)}
+            />
+          </Animated.View>
+
+          {/* Password */}
+          <Animated.View entering={FadeInDown.delay(200).springify()} style={[styles.inputContainer, passwordFocused && styles.inputContainerFocused]}>
+            <View style={[styles.inputIcon, passwordFocused && styles.inputIconFocused]}>
+              <MaterialCommunityIcons name="lock-outline" size={20} color={passwordFocused ? Colors.primary : Colors.gray400} />
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor={Colors.textTertiary}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              editable={!signInMutation.isPending}
+              onFocus={() => setPasswordFocused(true)}
+              onBlur={() => setPasswordFocused(false)}
+            />
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={Colors.gray400} />
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Forgot Password */}
+          <Animated.View entering={FadeInDown.delay(250).springify()}>
+            <Link href="/auth/forgot-password" asChild>
+              <TouchableOpacity style={styles.forgotButton}>
+                <Text style={styles.forgotButtonText}>Forgot Password?</Text>
+              </TouchableOpacity>
+            </Link>
+          </Animated.View>
+
+          {/* Divider & Google */}
+          {IS_GOOGLE_CONFIGURED && (
+            <Animated.View entering={FadeInDown.delay(300).springify()}>
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <GoogleSignInButton onError={(err) => error("Google Sign-In Failed", err)} disabled={signInMutation.isPending} />
+            </Animated.View>
+          )}
+
+          {/* Create Account */}
+          <Animated.View entering={FadeInDown.delay(350).springify()}>
+            <Link href="/auth/signup" asChild>
+              <TouchableOpacity style={styles.createAccountButton} activeOpacity={0.7}>
+                <Text style={styles.createAccountText}>Don't have an account?</Text>
+                <Text style={styles.createAccountLink}>Create Account</Text>
+              </TouchableOpacity>
+            </Link>
+          </Animated.View>
         </ScrollView>
+
+        {/* Bottom CTA */}
+        <SafeAreaView edges={["bottom"]} style={styles.bottomCTA}>
+          <Animated.View entering={FadeInDown.delay(400).springify()}>
+            <DepthButton
+              onPress={handleLogin}
+              disabled={signInMutation.isPending}
+              loading={signInMutation.isPending}
+              variant="primary"
+              size="lg"
+            >
+              {signInMutation.isPending ? "Signing in..." : "Sign In"}
+            </DepthButton>
+          </Animated.View>
+        </SafeAreaView>
       </KeyboardAvoidingView>
     </View>
   );
@@ -218,157 +168,144 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.gray50,
+    backgroundColor: Colors.background,
   },
-  headerGradient: {
-    paddingTop: Platform.OS === "ios" ? 60 : 50,
-    paddingBottom: 40,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
+  heroSection: {
+    borderBottomLeftRadius: BorderRadius["3xl"],
+    borderBottomRightRadius: BorderRadius["3xl"],
   },
-  logoSection: {
+  heroContent: {
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing["3xl"],
     alignItems: "center",
   },
+  logoWrapper: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.md,
+  },
   logo: {
-    width: 120,
-    height: 120,
-    marginBottom: 12,
+    width: 72,
+    height: 72,
   },
   appName: {
-    fontSize: 24,
+    fontSize: Typography.fontSize["2xl"],
     fontWeight: "800",
     color: Colors.textInverse,
-    textShadowColor: "rgba(0, 0, 0, 0.2)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    letterSpacing: -0.5,
   },
   tagline: {
-    fontSize: 14,
-    color: "rgba(255, 255, 255, 0.9)",
-    marginTop: 4,
+    fontSize: Typography.fontSize.sm,
     fontWeight: "500",
+    color: "rgba(255,255,255,0.85)",
+    marginTop: Spacing.xs,
   },
   formContainer: {
     flex: 1,
-    marginTop: -20,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.lg,
   },
-  card: {
-    backgroundColor: Colors.background,
-    borderRadius: 20,
-    padding: 28,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.04)",
-    ...Shadows.md,
-  },
-  welcomeText: {
-    fontSize: 26,
+  title: {
+    fontSize: Typography.fontSize.xl,
     fontWeight: "700",
     color: Colors.text,
-    textAlign: "center",
     letterSpacing: -0.5,
   },
-  instructionText: {
-    fontSize: 14,
+  subtitle: {
+    fontSize: Typography.fontSize.sm,
     color: Colors.textSecondary,
-    textAlign: "center",
-    marginTop: 4,
-    marginBottom: 24,
-  },
-  form: {
-    width: "100%",
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.xl,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "rgba(0,0,0,0.08)",
-    borderRadius: 14,
-    marginBottom: 16,
     backgroundColor: Colors.backgroundSecondary,
-    paddingHorizontal: 16,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: Spacing.md,
   },
   inputContainerFocused: {
     borderColor: Colors.primary,
     backgroundColor: Colors.background,
   },
   inputIcon: {
-    marginRight: 12,
+    width: 44,
+    height: 52,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inputIconFocused: {
+    backgroundColor: Colors.primary + "08",
+    borderTopLeftRadius: BorderRadius.xl - 1,
+    borderBottomLeftRadius: BorderRadius.xl - 1,
   },
   input: {
     flex: 1,
-    padding: 16,
-    paddingLeft: 0,
-    fontSize: 16,
+    paddingVertical: Spacing.md,
+    paddingRight: Spacing.md,
+    fontSize: Typography.fontSize.base,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
   },
   eyeButton: {
-    padding: 8,
+    padding: Spacing.md,
   },
-  button: {
-    borderRadius: 14,
-    marginTop: 12,
-    overflow: "hidden",
-    ...Shadows.primary,
+  forgotButton: {
+    alignSelf: "flex-end",
+    paddingVertical: Spacing.sm,
   },
-  buttonGradient: {
-    padding: 18,
-    alignItems: "center",
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: Colors.textInverse,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  linkButton: {
-    padding: 8,
-    marginTop: 16,
-    alignItems: "center",
-  },
-  linkText: {
-    color: Colors.primary,
-    fontSize: 14,
+  forgotButtonText: {
+    fontSize: Typography.fontSize.sm,
     fontWeight: "600",
-  },
-  dividerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 24,
+    color: Colors.primary,
   },
   divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: Spacing.xl,
+  },
+  dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: "rgba(0,0,0,0.06)",
+    backgroundColor: Colors.border,
   },
   dividerText: {
-    marginHorizontal: 16,
-    fontSize: 12,
-    color: Colors.gray400,
-    fontWeight: "600",
+    paddingHorizontal: Spacing.md,
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textTertiary,
+    fontWeight: "500",
   },
-  secondaryButton: {
+  createAccountButton: {
     flexDirection: "row",
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    padding: 16,
-    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    backgroundColor: Colors.background,
+    gap: Spacing.xs,
+    paddingVertical: Spacing.lg,
   },
-  secondaryButtonText: {
+  createAccountText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.textSecondary,
+  },
+  createAccountLink: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: "700",
     color: Colors.primary,
-    fontSize: 16,
-    fontWeight: "600",
   },
-  spacer: {
-    height: 12,
+  bottomCTA: {
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    backgroundColor: Colors.background,
   },
 });

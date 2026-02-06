@@ -20,7 +20,7 @@ import {
 } from '@/hooks/queries/useEmployerRequests';
 import { useRequestJoinOrganization } from '@/hooks/mutations/useEmployerMutations';
 import { EmployerSearchResult } from '@/lib/types';
-import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, FontFamily } from '@/constants/theme';
 import { Text } from '@/components/ui/Text';
 
 export default function SearchEmployerScreen() {
@@ -421,6 +421,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: Spacing.lg,
     fontSize: Typography.fontSize.base,
+    fontFamily: FontFamily.regular,
     color: Colors.text,
   },
   clearButton: {

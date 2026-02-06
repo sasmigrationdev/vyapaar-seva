@@ -23,7 +23,7 @@ import {
   isFuture,
 } from "date-fns";
 import { useState, useCallback } from "react";
-import { View, StyleSheet, Pressable } from "react-native";
+import { View, StyleSheet, Pressable, Platform } from "react-native";
 import Animated, { FadeInDown, FadeIn, FadeInUp } from "react-native-reanimated";
 
 interface MiniCalendarHeatmapProps {
@@ -376,11 +376,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cellWithShadow: {
-    shadowColor: "#22C55E",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 1,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#22C55E",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+      },
+      android: { elevation: 1 },
+    }),
   },
   dayNumber: {
     fontSize: 10,

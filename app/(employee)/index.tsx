@@ -4,15 +4,12 @@ import WiFiVerificationModal from "@/components/attendance/WiFiVerificationModal
 import AttendanceStreakBadge from "@/components/ui/AttendanceStreakBadge";
 import CircularHoursProgress from "@/components/ui/CircularHoursProgress";
 import { DepthButton } from "@/components/ui/DepthButton";
-import { DynamicGreetingInline } from "@/components/ui/DynamicGreeting";
-import MarketingBanner, { PlaceholderBanner } from "@/components/ui/MarketingBanner";
 import MiniCalendarHeatmap from "@/components/ui/MiniCalendarHeatmap";
 import { NeumorphicCheckInButton } from "@/components/ui/NeumorphicCheckInButton";
 import { Text } from "@/components/ui/Text";
 import {
   BorderRadius,
   Colors,
-  Gradients,
   PressOpacity,
   Shadows,
   Spacing,
@@ -44,7 +41,7 @@ import {
   calculateBreakDuration,
   formatHours,
 } from "@/lib/utils/attendance.utils";
-import { formatDate, formatTime } from "@/lib/utils/date.utils";
+import { formatTime } from "@/lib/utils/date.utils";
 import { formatCurrency } from "@/lib/utils/salary.utils";
 import {
   performWiFiVerification,
@@ -57,18 +54,134 @@ import {
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Href, useRouter } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
   RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
   TouchableOpacity,
   View,
+  Image,
 } from "react-native";
-import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import Animated, {
+  FadeInDown,
+  FadeInUp,
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  withSequence,
+  Easing,
+} from "react-native-reanimated";
 import { useAlert } from "@/hooks/useAlert";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+// Animated pulse component for live indicator
+function PulsingDot({ color }: { color: string }) {
+  const scale = useSharedValue(1);
+  const opacity = useSharedValue(1);
+
+  useEffect(() => {
+    scale.value = withRepeat(
+      withSequence(
+        withTiming(1.3, { duration: 800, easing: Easing.out(Easing.ease) }),
+        withTiming(1, { duration: 800, easing: Easing.in(Easing.ease) })
+      ),
+      -1,
+      false
+    );
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0.5, { duration: 800 }),
+        withTiming(1, { duration: 800 })
+      ),
+      -1,
+      false
+    );
+  }, [scale, opacity]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          backgroundColor: color,
+        },
+        animatedStyle,
+      ]}
+    />
+  );
+}
+
+// Feature Card Component
+function FeatureCard({
+  icon,
+  iconColor,
+  iconBg,
+  title,
+  description,
+  onPress,
+}: {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  iconColor: string;
+  iconBg: string;
+  title: string;
+  description: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={styles.featureCard}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.featureIcon, { backgroundColor: iconBg }]}>
+        <MaterialCommunityIcons name={icon} size={24} color={iconColor} />
+      </View>
+      <View style={styles.featureContent}>
+        <Text style={styles.featureTitle}>{title}</Text>
+        <Text style={styles.featureDescription}>{description}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color={Colors.gray300} />
+    </TouchableOpacity>
+  );
+}
+
+// Tip Card Component
+function TipCard({
+  icon,
+  title,
+  tip,
+  bgColor,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  tip: string;
+  bgColor: string;
+}) {
+  return (
+    <View style={[styles.tipCard, { backgroundColor: bgColor }]}>
+      <View style={styles.tipIcon}>
+        <Ionicons name={icon} size={20} color="#FFFFFF" />
+      </View>
+      <View style={styles.tipContent}>
+        <Text style={styles.tipTitle}>{title}</Text>
+        <Text style={styles.tipText}>{tip}</Text>
+      </View>
+    </View>
+  );
+}
 
 export default function EmployeeDashboard() {
   const [refreshing, setRefreshing] = useState(false);
@@ -156,13 +269,12 @@ export default function EmployeeDashboard() {
     ) {
       const now = new Date();
       const startTime = new Date(req.actual_start_time);
-      return now < startTime; // Break is scheduled but not started yet
+      return now < startTime;
     }
     return false;
   });
 
   // Find active break for today (currently on break)
-  // Only consider it active if the actual_start_time has been reached
   const activeBreak = myBreakRequests?.find((req: any) => {
     if (
       req.attendance_record_id === todayAttendance?.id &&
@@ -203,10 +315,7 @@ export default function EmployeeDashboard() {
       success("Success", "Checked in successfully!");
     },
     onError: (err) => {
-      error(
-        "Error",
-        err.message || "Failed to check in. Please try again."
-      );
+      error("Error", err.message || "Failed to check in. Please try again.");
     },
   });
 
@@ -215,22 +324,16 @@ export default function EmployeeDashboard() {
       success("Success", "Checked out successfully!");
     },
     onError: (err) => {
-      error(
-        "Error",
-        err.message || "Failed to check out. Please try again."
-      );
+      error("Error", err.message || "Failed to check out. Please try again.");
     },
   });
 
-  const endBreakMutation = useEndBreak(userId, user?.organization_id, {
+  const endBreakMutation = useEndBreak(userId, user?.organization_id ?? undefined, {
     onSuccess: () => {
       success("Success", "Break ended successfully!");
     },
     onError: (err: any) => {
-      error(
-        "Error",
-        err.message || "Failed to end break. Please try again."
-      );
+      error("Error", err.message || "Failed to end break. Please try again.");
     },
   });
 
@@ -240,33 +343,25 @@ export default function EmployeeDashboard() {
       return;
     }
 
-    // Perform WiFi verification
     const wifiResult = await performWiFiVerification(
       userId,
       user.organization_id
     );
 
-    // Show modal with verification result
     setWifiVerificationResult(wifiResult);
     setPendingAction("check-in");
     setShowWiFiModal(true);
 
-    // Only proceed if verification passed OR not required
     if (!wifiResult.isRequired || wifiResult.isVerified) {
-      // Proceed with check-in after modal is shown
       setTimeout(() => {
         checkInMutation.mutate({
           notes: "Self check-in",
           wifiInfo: wifiResult.isVerified
-            ? {
-                ssid: wifiResult.currentSsid,
-                verified: true,
-              }
+            ? { ssid: wifiResult.currentSsid, verified: true }
             : undefined,
         });
-      }, 2000); // Give user 2 seconds to see the modal
+      }, 2000);
     } else {
-      // Verification required but failed - don't proceed
       error(
         "WiFi Verification Required",
         "Your organization requires WiFi verification. Please connect to the office WiFi network and try again."
@@ -285,20 +380,16 @@ export default function EmployeeDashboard() {
       return;
     }
 
-    // Perform WiFi verification
     const wifiResult = await performWiFiVerification(
       userId,
       user.organization_id
     );
 
-    // Show modal with verification result
     setWifiVerificationResult(wifiResult);
-    setPendingAction("check-in"); // Reuse check-in for display
+    setPendingAction("check-in");
     setShowWiFiModal(true);
 
-    // Only proceed if verification passed OR not required
     if (!wifiResult.isRequired || wifiResult.isVerified) {
-      // Proceed with ending break after modal is shown
       setTimeout(() => {
         endBreakMutation.mutate({
           breakRequestId: activeBreak.id,
@@ -307,9 +398,8 @@ export default function EmployeeDashboard() {
             : undefined,
           wifiVerified: wifiResult.isVerified,
         });
-      }, 2000); // Give user 2 seconds to see the modal
+      }, 2000);
     } else {
-      // Verification required but failed - don't proceed
       error(
         "WiFi Verification Required",
         "Your organization requires WiFi verification. Please connect to the office WiFi network and try again."
@@ -318,7 +408,6 @@ export default function EmployeeDashboard() {
   };
 
   const handleCheckOut = async () => {
-    // Prevent checkout if break is active
     if (activeBreak) {
       error(
         "Break in Progress",
@@ -328,10 +417,7 @@ export default function EmployeeDashboard() {
     }
 
     if (!todayAttendance?.id) {
-      error(
-        "Error",
-        "No attendance record found. Please check in first."
-      );
+      error("Error", "No attendance record found. Please check in first.");
       return;
     }
 
@@ -340,34 +426,26 @@ export default function EmployeeDashboard() {
       return;
     }
 
-    // Perform WiFi verification
     const wifiResult = await performWiFiVerification(
       userId,
       user.organization_id
     );
 
-    // Show modal with verification result
     setWifiVerificationResult(wifiResult);
     setPendingAction("check-out");
     setShowWiFiModal(true);
 
-    // Only proceed if verification passed OR not required
     if (!wifiResult.isRequired || wifiResult.isVerified) {
-      // Proceed with check-out after modal is shown
       setTimeout(() => {
         checkOutMutation.mutate({
           recordId: todayAttendance.id,
           notes: "Self check-out",
           wifiInfo: wifiResult.isVerified
-            ? {
-                ssid: wifiResult.currentSsid,
-                verified: true,
-              }
+            ? { ssid: wifiResult.currentSsid, verified: true }
             : undefined,
         });
-      }, 2000); // Give user 2 seconds to see the modal
+      }, 2000);
     } else {
-      // Verification required but failed - don't proceed
       error(
         "WiFi Verification Required",
         "Your organization requires WiFi verification. Please connect to the office WiFi network and try again."
@@ -376,6 +454,7 @@ export default function EmployeeDashboard() {
   };
 
   const isCheckedIn = todayAttendance && !todayAttendance.check_out_time;
+  const isCheckedOut = todayAttendance && todayAttendance.check_out_time;
   const workingDays = (user?.working_days || []) as WeekDay[];
   const isTodayWorking = isTodayWorkingDay(workingDays);
   const canCheckIn = !todayAttendance && isTodayWorking;
@@ -386,7 +465,10 @@ export default function EmployeeDashboard() {
     organizationId: user?.organization_id ?? undefined,
     workingDays,
     onAutoCheckin: () => {
-      success("Auto Check-In", "You've been automatically checked in via WiFi.");
+      success(
+        "Auto Check-In",
+        "You've been automatically checked in via WiFi."
+      );
       refetchToday();
     },
     onAutoCheckout: () => {
@@ -394,21 +476,39 @@ export default function EmployeeDashboard() {
       refetchToday();
     },
     onBlocked: (reason) => {
-      // Silently log blocked auto-checkout (e.g., during break)
       console.log("Auto check-out blocked:", reason);
     },
   });
 
   // Calculate attendance streak
-  const attendanceStreak = calculateAttendanceStreak(monthlySummary?.records || []);
+  const attendanceStreak = calculateAttendanceStreak(
+    monthlySummary?.records || []
+  );
 
-  // Get attendance color based on percentage
-  const getAttendanceColor = (percentage?: number) => {
-    if (!percentage) return Colors.gray400;
-    if (percentage >= 90) return Colors.success;
-    if (percentage >= 70) return Colors.warning;
-    return Colors.error;
-  };
+  // Calculate employment duration
+  const employmentDuration = useMemo(() => {
+    if (!currentEmployment?.joined_at) return undefined;
+    const months = Math.floor(
+      (new Date().getTime() - new Date(currentEmployment.joined_at).getTime()) /
+        (1000 * 60 * 60 * 24 * 30)
+    );
+    if (months < 1) return "New";
+    const years = Math.floor(months / 12);
+    const remainingMonths = months % 12;
+    if (years === 0) return `${months} months`;
+    if (remainingMonths === 0) return `${years} year${years > 1 ? "s" : ""}`;
+    return `${years}y ${remainingMonths}m`;
+  }, [currentEmployment?.joined_at]);
+
+  // Check if user is new (less than 7 days or no attendance)
+  const isNewEmployee = useMemo(() => {
+    if (!currentEmployment?.joined_at) return true;
+    const joinedDays = Math.floor(
+      (new Date().getTime() - new Date(currentEmployment.joined_at).getTime()) /
+        (1000 * 60 * 60 * 24)
+    );
+    return joinedDays < 7 || (monthlyStats?.daysAttended || 0) < 3;
+  }, [currentEmployment?.joined_at, monthlyStats?.daysAttended]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -432,6 +532,53 @@ export default function EmployeeDashboard() {
   // Check for any loading errors
   const hasError = todayError || monthlyError || monthlyStatsError;
 
+  // Get greeting based on time
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
+  };
+
+  // Get status message
+  const getStatusMessage = () => {
+    if (activeBreak) return "On Break";
+    if (isCheckedIn) return "Working";
+    if (isCheckedOut) return "Day Complete";
+    if (!isTodayWorking) return "Day Off";
+    return "Not Checked In";
+  };
+
+  const getStatusColor = () => {
+    if (activeBreak) return Colors.warning;
+    if (isCheckedIn) return Colors.success;
+    if (isCheckedOut) return Colors.info;
+    return Colors.gray400;
+  };
+
+  // Get current date formatted nicely
+  const currentDateFormatted = useMemo(() => {
+    const date = new Date();
+    const options: Intl.DateTimeFormatOptions = {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    };
+    return date.toLocaleDateString("en-US", options);
+  }, []);
+
+  // Random tip for variety
+  const dailyTip = useMemo(() => {
+    const tips = [
+      { icon: "bulb-outline" as const, title: "Pro Tip", tip: "Check in on time to maintain your attendance streak and earn bonus points!", bgColor: Colors.warning },
+      { icon: "timer-outline" as const, title: "Did You Know?", tip: "Regular breaks improve productivity. Don't forget to take your scheduled breaks!", bgColor: Colors.info },
+      { icon: "trending-up-outline" as const, title: "Keep Going!", tip: "Consistent attendance can lead to better performance reviews and opportunities.", bgColor: Colors.success },
+      { icon: "star-outline" as const, title: "Achievement Unlocked", tip: "Build your streak! Employees with 20+ day streaks get recognized monthly.", bgColor: Colors.purple },
+    ];
+    const dayOfYear = Math.floor((new Date().getTime() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+    return tips[dayOfYear % tips.length];
+  }, []);
+
   return (
     <View style={styles.container}>
       <StatusBar
@@ -453,1101 +600,793 @@ export default function EmployeeDashboard() {
           />
         }
       >
+        {/* HERO SECTION - Check In/Out as Primary Action */}
         <LinearGradient
-          colors={Gradients.saffronHero}
+          colors={["#FF8C42", "#FF6B35", "#FF5722"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.heroSection}
+          style={styles.heroGradient}
         >
-          <View style={styles.heroHeaderRow}>
-            <View style={styles.heroTextBlock}>
-              <DynamicGreetingInline userName={user?.full_name || ""} />
-              <Text style={styles.heroGreeting}>
+          {/* Top Bar - Profile & Settings */}
+          <View style={styles.topBar}>
+            <View style={styles.greetingSection}>
+              <Text style={styles.greetingText}>{getGreeting()}</Text>
+              <Text style={styles.nameText}>
                 {user?.full_name?.split(" ")[0]}
               </Text>
-              <View style={styles.heroDatePill}>
-                <Feather name="calendar" size={12} color="rgba(255,255,255,0.9)" />
-                <Text style={styles.heroDateText}>
-                  {formatDate(new Date())}
-                </Text>
-              </View>
             </View>
 
-            <TouchableOpacity
-              style={styles.avatarButton}
-              onPress={() => router.push("/profile")}
-              accessibilityLabel="Open profile settings"
-              accessibilityRole="button"
-            >
-              <Text style={styles.avatarLetter}>
-                {user?.full_name?.charAt(0).toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Monthly Attendance Summary */}
-          <View style={styles.heroMetricsRow}>
-            <View style={[styles.heroMetricCard, styles.heroMetricPrimary]}>
-              <View
-                style={[styles.heroMetricIcon, styles.heroMetricIconOverlay]}
-              >
-                <MaterialCommunityIcons
-                  name="clock-outline"
-                  size={22}
-                  color={Colors.primary}
-                />
-              </View>
-              <View style={styles.heroMetricContent}>
-                <Text style={styles.heroMetricLabel}>this month</Text>
-                <Text style={styles.heroMetricValue} numberOfLines={1}>
-                  {monthlyStatsLoading
-                    ? "--"
-                    : formatHours(monthlyStats?.totalWorkingHours || 0)}
-                </Text>
-              </View>
-            </View>
-
-            <View style={[styles.heroMetricCard, styles.heroMetricSecondary]}>
-              <View
-                style={[
-                  styles.heroMetricIcon,
-                  {
-                    backgroundColor:
-                      getAttendanceColor(monthlyStats?.attendancePercentage) +
-                      "20",
-                  },
-                ]}
+            <View style={styles.topBarActions}>
+              <TouchableOpacity
+                style={styles.topBarButton}
+                onPress={() => router.push("/(employee)/leave")}
+                activeOpacity={0.7}
               >
                 <Ionicons
-                  name="trending-up-outline"
+                  name="notifications-outline"
                   size={22}
-                  color={getAttendanceColor(monthlyStats?.attendancePercentage)}
+                  color="#FFFFFF"
                 />
-              </View>
-              <View style={styles.heroMetricContent}>
-                <Text style={styles.heroMetricLabel}>attendance</Text>
-                <Text style={styles.heroMetricValue} numberOfLines={1}>
-                  {monthlyStatsLoading
-                    ? "--"
-                    : `${monthlyStats?.daysAttended || 0}d (${monthlyStats?.attendancePercentage || 0}%)`}
-                </Text>
-              </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.topBarButton}
+                onPress={() => router.push("/profile")}
+                activeOpacity={0.7}
+              >
+                <View style={styles.avatarCircle}>
+                  <Text style={styles.avatarText}>
+                    {user?.full_name?.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* Employment Status Metrics */}
-          {currentEmployment && (
-            <View style={styles.heroMetricsRow}>
-              <View style={[styles.heroMetricCard, styles.heroMetricPrimary]}>
+          {/* Status Pill */}
+          <Animated.View
+            entering={FadeInDown.delay(100).springify()}
+            style={styles.statusPillContainer}
+          >
+            <View
+              style={[
+                styles.statusPill,
+                { backgroundColor: "rgba(255,255,255,0.2)" },
+              ]}
+            >
+              {(isCheckedIn || activeBreak) && (
+                <PulsingDot color={getStatusColor()} />
+              )}
+              {!isCheckedIn && !activeBreak && (
                 <View
-                  style={[styles.heroMetricIcon, styles.heroMetricIconOverlay]}
-                >
+                  style={[
+                    styles.statusDotStatic,
+                    { backgroundColor: getStatusColor() },
+                  ]}
+                />
+              )}
+              <Text style={styles.statusPillText}>{getStatusMessage()}</Text>
+              {attendanceStreak.currentStreak > 0 && (
+                <View style={styles.streakBadgeSmall}>
                   <MaterialCommunityIcons
-                    name="office-building"
-                    size={22}
-                    color={Colors.primary}
+                    name="fire"
+                    size={12}
+                    color="#FF9500"
                   />
-                </View>
-                <View style={styles.heroMetricContent}>
-                  <Text style={styles.heroMetricLabel}>employer</Text>
-                  <Text
-                    style={styles.heroMetricValue}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.6}
-                  >
-                    {currentEmployment.organization?.name || "Organization"}
+                  <Text style={styles.streakBadgeText}>
+                    {attendanceStreak.currentStreak}
                   </Text>
                 </View>
-              </View>
-
-              <View style={[styles.heroMetricCard, styles.heroMetricSecondary]}>
-                <View
-                  style={[styles.heroMetricIcon, styles.heroMetricIconOverlay]}
-                >
-                  <Feather
-                    name="calendar"
-                    size={22}
-                    color={Colors.primary}
-                  />
-                </View>
-                <View style={styles.heroMetricContent}>
-                  <Text style={styles.heroMetricLabel}>duration</Text>
-                  <Text style={styles.heroMetricValue} numberOfLines={1}>
-                    {(() => {
-                      const months = Math.floor(
-                        (new Date().getTime() -
-                          new Date(currentEmployment.joined_at).getTime()) /
-                          (1000 * 60 * 60 * 24 * 30)
-                      );
-                      if (months < 1) return "New";
-                      const years = Math.floor(months / 12);
-                      const remainingMonths = months % 12;
-                      if (years === 0) return `${months}mo`;
-                      if (remainingMonths === 0) return `${years}yr`;
-                      return `${years}y ${remainingMonths}m`;
-                    })()}
-                  </Text>
-                </View>
-              </View>
+              )}
             </View>
+          </Animated.View>
+
+          {/* Main Check-In/Out Button */}
+          <Animated.View
+            entering={FadeInUp.delay(200).springify()}
+            style={styles.checkInSection}
+          >
+            {loadingToday ? (
+              <View style={styles.loadingCheckIn}>
+                <ActivityIndicator size="large" color="#FFFFFF" />
+              </View>
+            ) : (
+              <>
+                {!isTodayWorking && !todayAttendance ? (
+                  <View style={styles.dayOffContainer}>
+                    <View style={styles.dayOffIcon}>
+                      <Ionicons name="sunny" size={48} color="#FFD93D" />
+                    </View>
+                    <Text style={styles.dayOffTitle}>It's Your Day Off!</Text>
+                    <Text style={styles.dayOffSubtitle}>
+                      Enjoy your time. See you on{" "}
+                      {workingDays.length > 0
+                        ? formatWorkingDays(workingDays)
+                        : "your next working day"}
+                    </Text>
+                  </View>
+                ) : isCheckedOut ? (
+                  <View style={styles.completedDayContainer}>
+                    <View style={styles.completedIcon}>
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={64}
+                        color="#4ADE80"
+                      />
+                    </View>
+                    <Text style={styles.completedTitle}>Great Work Today!</Text>
+                    <View style={styles.completedStats}>
+                      <View style={styles.completedStatItem}>
+                        <Text style={styles.completedStatValue}>
+                          {formatHours(
+                            (todayAttendance?.total_hours || 0) -
+                              (todayAttendance?.overtime_hours || 0)
+                          )}
+                        </Text>
+                        <Text style={styles.completedStatLabel}>Hours</Text>
+                      </View>
+                      {(todayAttendance?.overtime_hours || 0) > 0 && (
+                        <View style={styles.completedStatItem}>
+                          <Text
+                            style={[
+                              styles.completedStatValue,
+                              { color: Colors.purple },
+                            ]}
+                          >
+                            +{formatHours(todayAttendance?.overtime_hours || 0)}
+                          </Text>
+                          <Text style={styles.completedStatLabel}>Overtime</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                ) : activeBreak || upcomingBreak ? (
+                  <View style={styles.breakContainer}>
+                    <View style={styles.breakIconWrapper}>
+                      <MaterialCommunityIcons
+                        name="coffee"
+                        size={48}
+                        color="#FFFFFF"
+                      />
+                    </View>
+                    <Text style={styles.breakTitle}>
+                      {activeBreak ? "On Break" : "Break Scheduled"}
+                    </Text>
+                    <Text style={styles.breakTime}>
+                      {activeBreak
+                        ? `Started at ${formatTime(new Date(activeBreak.actual_start_time || ""))}`
+                        : `Starts at ${formatTime(new Date(upcomingBreak?.actual_start_time || ""))}`}
+                    </Text>
+                    {activeBreak && (
+                      <TouchableOpacity
+                        style={styles.endBreakButton}
+                        onPress={handleEndBreak}
+                        disabled={endBreakMutation.isPending}
+                        activeOpacity={0.8}
+                      >
+                        {endBreakMutation.isPending ? (
+                          <ActivityIndicator size="small" color="#FF6B35" />
+                        ) : (
+                          <>
+                            <MaterialCommunityIcons
+                              name="coffee-to-go"
+                              size={20}
+                              color="#FF6B35"
+                            />
+                            <Text style={styles.endBreakButtonText}>
+                              End Break
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ) : (
+                  <View style={styles.checkInButtonWrapper}>
+                    <NeumorphicCheckInButton
+                      onPress={isCheckedIn ? handleCheckOut : handleCheckIn}
+                      disabled={
+                        checkInMutation.isPending || checkOutMutation.isPending
+                      }
+                      loading={
+                        checkInMutation.isPending || checkOutMutation.isPending
+                      }
+                      isCheckedIn={!!isCheckedIn}
+                      checkInTime={todayAttendance?.check_in_time}
+                      size={160}
+                    />
+                  </View>
+                )}
+              </>
+            )}
+          </Animated.View>
+
+          {/* Today's Time Info (only if checked in) */}
+          {todayAttendance && !activeBreak && !upcomingBreak && (
+            <Animated.View
+              entering={FadeInUp.delay(300).springify()}
+              style={styles.todayTimeRow}
+            >
+              <View style={styles.timeInfoItem}>
+                <Ionicons name="log-in-outline" size={16} color="#FFFFFF" />
+                <Text style={styles.timeInfoLabel}>In</Text>
+                <Text style={styles.timeInfoValue}>
+                  {formatTime(new Date(todayAttendance.check_in_time || ""))}
+                </Text>
+              </View>
+              <View style={styles.timeInfoDivider} />
+              <View style={styles.timeInfoItem}>
+                <Ionicons name="log-out-outline" size={16} color="#FFFFFF" />
+                <Text style={styles.timeInfoLabel}>Out</Text>
+                <Text style={styles.timeInfoValue}>
+                  {todayAttendance.check_out_time
+                    ? formatTime(new Date(todayAttendance.check_out_time))
+                    : "--:--"}
+                </Text>
+              </View>
+              <View style={styles.timeInfoDivider} />
+              <View style={styles.timeInfoItem}>
+                <Ionicons name="timer-outline" size={16} color="#FFFFFF" />
+                <Text style={styles.timeInfoLabel}>Hours</Text>
+                <Text style={styles.timeInfoValue}>
+                  {formatHours(todayAttendance.total_hours || 0)}
+                </Text>
+              </View>
+            </Animated.View>
           )}
         </LinearGradient>
 
         {/* Error Banner */}
         {hasError && (
-          <Animated.View entering={FadeInDown.delay(50).springify()} style={styles.errorBanner}>
+          <Animated.View
+            entering={FadeInDown.delay(50).springify()}
+            style={styles.errorBanner}
+          >
             <Ionicons name="alert-circle" size={20} color={Colors.error} />
             <Text style={styles.errorText}>Failed to load some data</Text>
             <TouchableOpacity
               onPress={onRefresh}
               activeOpacity={PressOpacity.primary}
-              accessibilityLabel="Retry loading data"
-              accessibilityRole="button"
             >
               <Text style={styles.retryText}>Retry</Text>
             </TouchableOpacity>
           </Animated.View>
         )}
 
-        {/* Promotional Banner Slot */}
-        <Animated.View entering={FadeInDown.delay(75).springify()} style={styles.bannerSlot}>
-          <MarketingBanner
-            variant="gradient"
-            title="Track Your Progress"
-            subtitle="View detailed attendance insights and earn rewards for consistency"
-            ctaText="Learn More"
-            gradientColors={[Colors.primary, Colors.primaryDark]}
-            badge="NEW"
-            aspectRatio={3}
+        {/* Date Card */}
+        <Animated.View
+          entering={FadeInDown.delay(100).springify()}
+          style={styles.dateCard}
+        >
+          <View style={styles.dateIconWrapper}>
+            <Ionicons name="calendar" size={20} color={Colors.primary} />
+          </View>
+          <Text style={styles.dateText}>{currentDateFormatted}</Text>
+        </Animated.View>
+
+        {/* Quick Actions - Horizontal Scroll */}
+        <Animated.View
+          entering={FadeInDown.delay(150).springify()}
+          style={styles.quickActionsSection}
+        >
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickActionsScroll}
+          >
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => router.push("/(employee)/salary")}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  styles.quickActionIcon,
+                  { backgroundColor: Colors.warningLight },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="wallet"
+                  size={24}
+                  color={Colors.warning}
+                />
+              </View>
+              <Text style={styles.quickActionLabel}>Salary</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => router.push("/(employee)/leave")}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  styles.quickActionIcon,
+                  { backgroundColor: Colors.pinkLight },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="palm-tree"
+                  size={24}
+                  color={Colors.pink}
+                />
+              </View>
+              <Text style={styles.quickActionLabel}>Leave</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => router.push("/(employee)/breaks")}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  styles.quickActionIcon,
+                  { backgroundColor: Colors.cyanLight },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="coffee"
+                  size={24}
+                  color={Colors.cyan}
+                />
+              </View>
+              <Text style={styles.quickActionLabel}>Breaks</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => router.push("/(employee)/attendance")}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  styles.quickActionIcon,
+                  { backgroundColor: Colors.primaryLight },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="calendar-clock"
+                  size={24}
+                  color={Colors.primary}
+                />
+              </View>
+              <Text style={styles.quickActionLabel}>History</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() =>
+                router.push("/(employee)/search-employer" as Href)
+              }
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  styles.quickActionIcon,
+                  { backgroundColor: Colors.indigoLight },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="magnify"
+                  size={24}
+                  color={Colors.indigo}
+                />
+              </View>
+              <Text style={styles.quickActionLabel}>Search</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </Animated.View>
+
+        {/* Break/Overtime Actions (context-aware) */}
+        {isCheckedIn && !activeBreak && !upcomingBreak && !pendingBreakRequest && (
+          <Animated.View
+            entering={FadeInDown.delay(200).springify()}
+            style={styles.contextActionsRow}
+          >
+            <TouchableOpacity
+              style={styles.contextActionButton}
+              onPress={() => setShowBreakRequestModal(true)}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons
+                name="coffee-outline"
+                size={20}
+                color={Colors.warning}
+              />
+              <Text style={styles.contextActionText}>Request Break</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
+        {/* Pending Break Request Card */}
+        {pendingBreakRequest && (
+          <Animated.View
+            entering={FadeInDown.delay(200).springify()}
+            style={styles.pendingBreakCard}
+          >
+            <View style={styles.pendingBreakHeader}>
+              <View style={styles.pendingBreakBadge}>
+                <PulsingDot color={Colors.warning} />
+                <Text style={styles.pendingBreakBadgeText}>Pending Approval</Text>
+              </View>
+            </View>
+            <View style={styles.pendingBreakContent}>
+              <MaterialCommunityIcons
+                name="coffee"
+                size={32}
+                color={Colors.warning}
+              />
+              <View style={styles.pendingBreakInfo}>
+                <Text style={styles.pendingBreakTime}>
+                  Break at{" "}
+                  {formatTime(
+                    new Date(pendingBreakRequest.requested_start_time || "")
+                  )}
+                </Text>
+                {pendingBreakRequest.reason && (
+                  <Text style={styles.pendingBreakReason}>
+                    {pendingBreakRequest.reason}
+                  </Text>
+                )}
+              </View>
+            </View>
+          </Animated.View>
+        )}
+
+        {/* Overtime Request/Display (after checkout) */}
+        {todayAttendance?.check_out_time && (
+          <Animated.View
+            entering={FadeInDown.delay(250).springify()}
+            style={styles.overtimeSection}
+          >
+            {todayOvertimeRequest?.status === "pending" ? (
+              <View style={styles.overtimePendingCard}>
+                <View style={styles.overtimePendingBadge}>
+                  <PulsingDot color={Colors.warning} />
+                  <Text style={styles.overtimePendingBadgeText}>
+                    Overtime Pending
+                  </Text>
+                </View>
+                <View style={styles.overtimePendingContent}>
+                  <Text style={styles.overtimePendingHours}>
+                    {formatHours(todayOvertimeRequest.requested_hours)} requested
+                  </Text>
+                  {todayOvertimeRequest.reason && (
+                    <Text style={styles.overtimePendingReason}>
+                      {todayOvertimeRequest.reason}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            ) : todayOvertimeRequest?.status === "approved" ||
+              (todayAttendance.overtime_hours || 0) > 0 ? (
+              <View style={styles.overtimeApprovedCard}>
+                <MaterialCommunityIcons
+                  name="clock-plus-outline"
+                  size={24}
+                  color={Colors.purple}
+                />
+                <View style={styles.overtimeApprovedInfo}>
+                  <Text style={styles.overtimeApprovedLabel}>Overtime</Text>
+                  <Text style={styles.overtimeApprovedValue}>
+                    +{formatHours(todayAttendance.overtime_hours || 0)}
+                  </Text>
+                </View>
+              </View>
+            ) : todayOvertimeRequest?.status === "rejected" ? (
+              <View style={styles.overtimeRejectedCard}>
+                <Ionicons name="close-circle" size={20} color={Colors.error} />
+                <Text style={styles.overtimeRejectedText}>
+                  Overtime request rejected
+                </Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.addOvertimeButton}
+                onPress={() => setShowOvertimeModal(true)}
+                activeOpacity={0.7}
+              >
+                <MaterialCommunityIcons
+                  name="clock-plus-outline"
+                  size={20}
+                  color={Colors.purple}
+                />
+                <Text style={styles.addOvertimeText}>Request Overtime</Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={18}
+                  color={Colors.gray400}
+                />
+              </TouchableOpacity>
+            )}
+          </Animated.View>
+        )}
+
+        {/* Monthly Progress Card */}
+        <Animated.View
+          entering={FadeInDown.delay(300).springify()}
+          style={styles.progressCard}
+        >
+          <View style={styles.progressCardHeader}>
+            <Text style={styles.progressCardTitle}>This Month</Text>
+            {attendanceStreak.currentStreak > 0 && (
+              <AttendanceStreakBadge
+                currentStreak={attendanceStreak.currentStreak}
+                size="sm"
+              />
+            )}
+          </View>
+
+          {monthlyStatsLoading ? (
+            <View style={styles.loadingSmall}>
+              <ActivityIndicator size="small" color={Colors.primary} />
+            </View>
+          ) : (
+            <>
+              <View style={styles.progressStats}>
+                <View style={styles.progressStatItem}>
+                  <Text style={styles.progressStatValue}>
+                    {monthlyStats?.daysAttended || 0}
+                  </Text>
+                  <Text style={styles.progressStatLabel}>Days</Text>
+                </View>
+                <View style={styles.progressStatDivider} />
+                <View style={styles.progressStatItem}>
+                  <Text style={styles.progressStatValue}>
+                    {Math.round(monthlyStats?.totalWorkingHours || 0)}h
+                  </Text>
+                  <Text style={styles.progressStatLabel}>Hours</Text>
+                </View>
+                <View style={styles.progressStatDivider} />
+                <View style={styles.progressStatItem}>
+                  <Text
+                    style={[styles.progressStatValue, { color: Colors.success }]}
+                  >
+                    {monthlyStats?.attendancePercentage || 0}%
+                  </Text>
+                  <Text style={styles.progressStatLabel}>Attendance</Text>
+                </View>
+              </View>
+
+              {/* Mini Calendar Heatmap */}
+              {monthlySummary?.records && monthlySummary.records.length > 0 && (
+                <View style={styles.heatmapWrapper}>
+                  <MiniCalendarHeatmap
+                    records={monthlySummary.records}
+                    month={new Date().getMonth()}
+                    year={new Date().getFullYear()}
+                  />
+                </View>
+              )}
+            </>
+          )}
+        </Animated.View>
+
+        {/* Employer Info Card */}
+        {currentEmployment && (
+          <Animated.View
+            entering={FadeInDown.delay(350).springify()}
+            style={styles.employerCard}
+          >
+            <View style={styles.employerCardLeft}>
+              <View style={styles.employerIcon}>
+                <MaterialCommunityIcons
+                  name="office-building"
+                  size={24}
+                  color={Colors.primary}
+                />
+              </View>
+              <View style={styles.employerInfo}>
+                <Text style={styles.employerName} numberOfLines={1}>
+                  {currentEmployment.organization?.name || "Organization"}
+                </Text>
+                <Text style={styles.employerDuration}>
+                  {employmentDuration} with company
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.changeEmployerButton}
+              onPress={() =>
+                router.push("/(employee)/employment-history" as Href)
+              }
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons
+                name="swap-horizontal"
+                size={18}
+                color={Colors.info}
+              />
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
+        {/* Earnings Preview (if has salary) */}
+        {user?.base_salary != null && user.base_salary > 0 && (
+          <Animated.View
+            entering={FadeInDown.delay(400).springify()}
+            style={styles.earningsCard}
+          >
+            <TouchableOpacity
+              style={styles.earningsCardContent}
+              onPress={() => router.push("/(employee)/salary")}
+              activeOpacity={0.7}
+            >
+              <View style={styles.earningsLeft}>
+                <View style={styles.earningsIcon}>
+                  <MaterialCommunityIcons
+                    name="wallet"
+                    size={24}
+                    color={Colors.warning}
+                  />
+                </View>
+                <View style={styles.earningsInfo}>
+                  <Text style={styles.earningsLabel}>
+                    {latestSalary?.month_year || "Earnings"}
+                  </Text>
+                  <Text style={styles.earningsValue}>
+                    {loadingSalary
+                      ? "..."
+                      : latestSalary
+                      ? formatCurrency(latestSalary.total_salary || 0)
+                      : "View Salary"}
+                  </Text>
+                </View>
+              </View>
+              {latestSalary && (
+                <View
+                  style={[
+                    styles.earningsStatus,
+                    latestSalary.status === "paid"
+                      ? styles.statusPaid
+                      : latestSalary.status === "approved"
+                      ? styles.statusApproved
+                      : styles.statusPending,
+                  ]}
+                >
+                  <Text style={styles.earningsStatusText}>
+                    {latestSalary.status}
+                  </Text>
+                </View>
+              )}
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={Colors.gray400}
+              />
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
+        {/* Daily Tip Card */}
+        <Animated.View
+          entering={FadeInDown.delay(450).springify()}
+          style={styles.tipSection}
+        >
+          <TipCard
+            icon={dailyTip.icon}
+            title={dailyTip.title}
+            tip={dailyTip.tip}
+            bgColor={dailyTip.bgColor}
           />
         </Animated.View>
 
-        <View style={styles.content}>
-          {/* Attendance Card */}
-          <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.modernSection}>
-            <View style={styles.modernSectionHeader}>
-              <Text style={styles.modernSectionTitle}>Today&apos;s Attendance</Text>
-              <View style={styles.headerBadgesRow}>
-                {attendanceStreak.currentStreak > 0 && (
-                  <AttendanceStreakBadge
-                    currentStreak={attendanceStreak.currentStreak}
-                    size="sm"
-                  />
-                )}
-                {todayAttendance && !todayAttendance.check_out_time && (
-                  <View style={styles.liveBadge}>
-                    <View style={styles.pulseDot} />
-                    <Text style={styles.liveText}>Active</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-
-            <View style={styles.card}>
-              {loadingToday ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color={Colors.primary} />
-                </View>
-              ) : (
-                <>
-                  {todayAttendance ? (
-                    <>
-                      <View style={styles.attendanceInfo}>
-                        <Animated.View entering={FadeInUp.delay(100).springify()} style={styles.timeCard}>
-                          <Ionicons
-                            name="log-in-outline"
-                            size={16}
-                            color={Colors.success}
-                          />
-                          <View style={styles.timeCardContent}>
-                            <Text style={styles.timeCardLabel}>In</Text>
-                            <Text style={styles.timeCardValue}>
-                              {formatTime(
-                                new Date(todayAttendance.check_in_time || "")
-                              )}
-                            </Text>
-                          </View>
-                        </Animated.View>
-
-                        <Animated.View entering={FadeInUp.delay(180).springify()} style={styles.timeCard}>
-                          <Ionicons
-                            name="log-out-outline"
-                            size={16}
-                            color={Colors.error}
-                          />
-                          <View style={styles.timeCardContent}>
-                            <Text style={styles.timeCardLabel}>Out</Text>
-                            <Text style={styles.timeCardValue}>
-                              {todayAttendance.check_out_time
-                                ? formatTime(
-                                    new Date(todayAttendance.check_out_time)
-                                  )
-                                : "--:--"}
-                            </Text>
-                          </View>
-                        </Animated.View>
-
-                        <Animated.View entering={FadeInUp.delay(260).springify()} style={styles.timeCard}>
-                          <Ionicons
-                            name="timer-outline"
-                            size={16}
-                            color={Colors.primary}
-                          />
-                          <View style={styles.timeCardContent}>
-                            <Text style={styles.timeCardLabel}>Hours</Text>
-                            <Text
-                              style={[styles.timeCardValue, styles.hoursValue]}
-                            >
-                              {formatHours(
-                                (todayAttendance.total_hours || 0) -
-                                  (todayAttendance.overtime_hours || 0)
-                              )}
-                            </Text>
-                            {(todayAttendance.overtime_hours || 0) > 0 && (
-                              <Text style={styles.overtimeIndicator}>
-                                +{formatHours(todayAttendance.overtime_hours || 0)} OT
-                              </Text>
-                            )}
-                          </View>
-                        </Animated.View>
-                      </View>
-
-                      {totalBreakDuration > 0 && (
-                        <Text style={styles.breakDeductionText}>
-                          Break: -{Math.floor(totalBreakDuration / 60)}h{" "}
-                          {totalBreakDuration % 60}m deducted from total hours
-                        </Text>
-                      )}
-
-                      {/* Overtime Display/Button - Only when day is completed */}
-                      {todayAttendance.check_out_time && (
-                        <>
-                          {todayOvertimeRequest?.status === "pending" ? (
-                            <View style={styles.overtimePendingCard}>
-                              <View style={styles.overtimePendingHeader}>
-                                <View style={styles.pulseDotOrange} />
-                                <Text style={styles.overtimePendingLabel}>
-                                  Waiting for Approval
-                                </Text>
-                              </View>
-                              <View style={styles.overtimePendingContent}>
-                                <MaterialCommunityIcons
-                                  name="clock-plus-outline"
-                                  size={24}
-                                  color={Colors.warning}
-                                />
-                                <View style={styles.overtimePendingInfo}>
-                                  <Text style={styles.overtimePendingHours}>
-                                    {formatHours(todayOvertimeRequest.requested_hours)} requested
-                                  </Text>
-                                  {todayOvertimeRequest.reason && (
-                                    <Text style={styles.overtimePendingReason}>
-                                      {todayOvertimeRequest.reason}
-                                    </Text>
-                                  )}
-                                </View>
-                              </View>
-                              <View style={styles.overtimePendingFooter}>
-                                <MaterialCommunityIcons
-                                  name="shield-check-outline"
-                                  size={14}
-                                  color={StatusColors.pending.text}
-                                />
-                                <Text style={styles.overtimePendingFooterText}>
-                                  Awaiting HR review and approval
-                                </Text>
-                              </View>
-                            </View>
-                          ) : todayOvertimeRequest?.status === "rejected" ? (
-                            <View style={styles.overtimeRejectedCard}>
-                              <View style={styles.overtimeRejectedHeader}>
-                                <Ionicons
-                                  name="close-circle"
-                                  size={16}
-                                  color={Colors.error}
-                                />
-                                <Text style={styles.overtimeRejectedLabel}>
-                                  Request Rejected
-                                </Text>
-                              </View>
-                              <View style={styles.overtimeRejectedContent}>
-                                <Text style={styles.overtimeRejectedHours}>
-                                  {formatHours(todayOvertimeRequest.requested_hours)} was requested
-                                </Text>
-                                {todayOvertimeRequest.reviewer_notes && (
-                                  <Text style={styles.overtimeRejectedReason}>
-                                    Note: {todayOvertimeRequest.reviewer_notes}
-                                  </Text>
-                                )}
-                              </View>
-                            </View>
-                          ) : (todayAttendance.overtime_hours || 0) > 0 ? (
-                            <View style={styles.overtimeDisplayCard}>
-                              <View style={styles.overtimeDisplayHeader}>
-                                <MaterialCommunityIcons
-                                  name="clock-plus-outline"
-                                  size={16}
-                                  color={Colors.purple}
-                                />
-                                <Text style={styles.overtimeDisplayLabel}>
-                                  Overtime
-                                </Text>
-                                <Text style={styles.overtimeDisplayValue}>
-                                  +{formatHours(todayAttendance.overtime_hours || 0)}
-                                </Text>
-                              </View>
-                              {todayAttendance.overtime_reason && (
-                                <Text style={styles.overtimeDisplayReason}>
-                                  {todayAttendance.overtime_reason}
-                                </Text>
-                              )}
-                            </View>
-                          ) : (
-                            <TouchableOpacity
-                              style={styles.addOvertimeButton}
-                              onPress={() => setShowOvertimeModal(true)}
-                              activeOpacity={0.7}
-                              accessibilityLabel="Add overtime hours"
-                              accessibilityRole="button"
-                              accessibilityHint="Opens modal to request overtime hours"
-                            >
-                              <MaterialCommunityIcons
-                                name="clock-plus-outline"
-                                size={14}
-                                color={Colors.purple}
-                              />
-                              <Text style={styles.addOvertimeButtonText}>
-                                Add Overtime
-                              </Text>
-                            </TouchableOpacity>
-                          )}
-                        </>
-                      )}
-                    </>
-                  ) : null}
-
-                  {!todayAttendance && !isTodayWorking && (
-                    <View style={styles.nonWorkingDayContainer}>
-                      <Ionicons
-                        name="calendar-outline"
-                        size={24}
-                        color={Colors.warning}
-                      />
-                      <Text style={styles.nonWorkingDayTitle}>
-                        Not a Working Day
-                      </Text>
-                      <Text style={styles.nonWorkingDayText}>
-                        Today is not a configured working day
-                      </Text>
-                      {workingDays.length > 0 && (
-                        <Text style={styles.workingDaysText}>
-                          Working days: {formatWorkingDays(workingDays)}
-                        </Text>
-                      )}
-                    </View>
-                  )}
-
-                  {/* Neumorphic Check-In/Check-Out Button */}
-                  {(canCheckIn || isCheckedIn) && !activeBreak && !upcomingBreak && (
-                    <View style={styles.neumorphicButtonContainer}>
-                      <NeumorphicCheckInButton
-                        onPress={isCheckedIn ? handleCheckOut : handleCheckIn}
-                        disabled={
-                          checkInMutation.isPending ||
-                          checkOutMutation.isPending
-                        }
-                        loading={
-                          checkInMutation.isPending ||
-                          checkOutMutation.isPending
-                        }
-                        isCheckedIn={!!isCheckedIn}
-                        checkInTime={todayAttendance?.check_in_time}
-                        size={140}
-                      />
-                    </View>
-                  )}
-
-                  {/* Show disabled checkout when on break */}
-                  {isCheckedIn && (activeBreak || upcomingBreak) && (
-                    <View style={styles.breakBlockedContainer}>
-                      <View style={styles.breakBlockedIcon}>
-                        <Ionicons
-                          name="lock-closed"
-                          size={24}
-                          color={Colors.gray400}
-                        />
-                      </View>
-                      <Text style={styles.breakBlockedText}>
-                        {activeBreak
-                          ? "Check-out blocked during break"
-                          : "Check-out blocked - break scheduled"}
-                      </Text>
-                    </View>
-                  )}
-
-                  {isCheckedIn && (
-                    <>
-
-                      {upcomingBreak ? (
-                        <View style={styles.upcomingBreakCard}>
-                          {/* Status Badge */}
-                          <View style={styles.upcomingStatusBadge}>
-                            <View style={styles.pulseDotBlue} />
-                            <Text style={styles.upcomingStatusText}>
-                              Break Approved - Scheduled
-                            </Text>
-                          </View>
-
-                          {/* Time Display */}
-                          <View style={styles.breakTimeDisplay}>
-                            <View style={styles.breakTimeMain}>
-                              <MaterialCommunityIcons
-                                name="clock-outline"
-                                size={32}
-                                color={Colors.info}
-                              />
-                              <View style={styles.breakTimeInfo}>
-                                <Text style={styles.breakTimeLabel}>
-                                  Break Starts At
-                                </Text>
-                                <Text
-                                  style={[
-                                    styles.breakTimeValue,
-                                    { color: StatusColors.info.text },
-                                  ]}
-                                >
-                                  {formatTime(
-                                    new Date(
-                                      upcomingBreak.actual_start_time || ""
-                                    )
-                                  )}
-                                </Text>
-                                <Text
-                                  style={[
-                                    styles.breakTimeLabel,
-                                    { marginTop: 4, fontSize: 11 },
-                                  ]}
-                                >
-                                  Break will start automatically at this time
-                                </Text>
-                              </View>
-                            </View>
-                          </View>
-
-                          {/* Reason */}
-                          {upcomingBreak.reason && (
-                            <View style={styles.breakReasonContainer}>
-                              <View style={styles.breakReasonHeader}>
-                                <Feather
-                                  name="message-circle"
-                                  size={14}
-                                  color={StatusColors.info.text}
-                                />
-                                <Text
-                                  style={[
-                                    styles.breakReasonLabel,
-                                    { color: StatusColors.info.text },
-                                  ]}
-                                >
-                                  Reason
-                                </Text>
-                              </View>
-                              <Text
-                                style={[
-                                  styles.breakReasonText,
-                                  { color: StatusColors.info.text },
-                                ]}
-                              >
-                                {upcomingBreak.reason}
-                              </Text>
-                            </View>
-                          )}
-
-                          {/* Footer Message */}
-                          <View
-                            style={[
-                              styles.breakPendingFooter,
-                              {
-                                backgroundColor: StatusColors.info.background,
-                                borderColor: StatusColors.info.border,
-                              },
-                            ]}
-                          >
-                            <MaterialCommunityIcons
-                              name="information-outline"
-                              size={16}
-                              color={StatusColors.info.text}
-                            />
-                            <Text
-                              style={[
-                                styles.breakPendingFooterText,
-                                { color: StatusColors.info.text },
-                              ]}
-                            >
-                              You can end the break once it starts
-                            </Text>
-                          </View>
-                        </View>
-                      ) : activeBreak ? (
-                        <View style={styles.ongoingBreakCard}>
-                          {/* Status Badge */}
-                          <View style={styles.ongoingStatusBadge}>
-                            <View style={styles.pulseDotGreen} />
-                            <Text style={styles.ongoingStatusText}>
-                              Break in Progress
-                            </Text>
-                          </View>
-
-                          {/* Time Display */}
-                          <View style={styles.breakTimeDisplay}>
-                            <View style={styles.breakTimeMain}>
-                              <MaterialCommunityIcons
-                                name="coffee"
-                                size={32}
-                                color={Colors.success}
-                              />
-                              <View style={styles.breakTimeInfo}>
-                                <Text style={styles.breakTimeLabel}>
-                                  Break Started
-                                </Text>
-                                <Text
-                                  style={[
-                                    styles.breakTimeValue,
-                                    { color: StatusColors.approved.text },
-                                  ]}
-                                >
-                                  {formatTime(
-                                    new Date(
-                                      activeBreak.actual_start_time || ""
-                                    )
-                                  )}
-                                </Text>
-                              </View>
-                            </View>
-                          </View>
-
-                          {/* Reason */}
-                          {activeBreak.reason && (
-                            <View style={styles.breakReasonContainer}>
-                              <View style={styles.breakReasonHeader}>
-                                <Feather
-                                  name="message-circle"
-                                  size={14}
-                                  color={StatusColors.pending.text}
-                                />
-                                <Text style={styles.breakReasonLabel}>
-                                  Reason
-                                </Text>
-                              </View>
-                              <Text style={styles.breakReasonText}>
-                                {activeBreak.reason}
-                              </Text>
-                            </View>
-                          )}
-
-                          {/* End Break Button */}
-                          <View style={styles.breakActionContainer}>
-                            <DepthButton
-                              onPress={handleEndBreak}
-                              disabled={endBreakMutation.isPending}
-                              loading={endBreakMutation.isPending}
-                              variant="success"
-                              size="md"
-                              icon={
-                                <MaterialCommunityIcons
-                                  name="coffee-to-go"
-                                  size={20}
-                                  color={Colors.textInverse}
-                                />
-                              }
-                            >
-                              End Break Now
-                            </DepthButton>
-                          </View>
-
-                          {/* Footer Message */}
-                          <View
-                            style={[
-                              styles.breakPendingFooter,
-                              {
-                                backgroundColor: StatusColors.approved.background,
-                                borderColor: StatusColors.approved.border,
-                              },
-                            ]}
-                          >
-                            <MaterialCommunityIcons
-                              name="information-outline"
-                              size={16}
-                              color={StatusColors.approved.text}
-                            />
-                            <Text
-                              style={[
-                                styles.breakPendingFooterText,
-                                { color: StatusColors.approved.text },
-                              ]}
-                            >
-                              End time will be recorded with WiFi verification
-                            </Text>
-                          </View>
-                        </View>
-                      ) : pendingBreakRequest ? (
-                        <View style={styles.pendingBreakCard}>
-                          {/* Status Badge */}
-                          <View style={styles.pendingStatusBadge}>
-                            <View style={styles.pulseDotOrange} />
-                            <Text style={styles.pendingStatusText}>
-                              Pending Approval
-                            </Text>
-                          </View>
-
-                          {/* Time Display */}
-                          {pendingBreakRequest.requested_start_time && (
-                            <View style={styles.breakTimeDisplay}>
-                              <View style={styles.breakTimeMain}>
-                                <MaterialCommunityIcons
-                                  name="coffee"
-                                  size={32}
-                                  color={Colors.warning}
-                                />
-                                <View style={styles.breakTimeInfo}>
-                                  <Text style={styles.breakTimeLabel}>
-                                    Break Start Time
-                                  </Text>
-                                  <Text style={styles.breakTimeValue}>
-                                    {formatTime(
-                                      new Date(
-                                        pendingBreakRequest.requested_start_time
-                                      )
-                                    )}
-                                  </Text>
-                                  <Text
-                                    style={[
-                                      styles.breakTimeLabel,
-                                      { marginTop: 4, fontSize: 11 },
-                                    ]}
-                                  >
-                                    End time will be recorded with WiFi
-                                    verification
-                                  </Text>
-                                </View>
-                              </View>
-                            </View>
-                          )}
-
-                          {/* Reason */}
-                          {pendingBreakRequest.reason && (
-                            <View style={styles.breakReasonContainer}>
-                              <View style={styles.breakReasonHeader}>
-                                <Feather
-                                  name="message-circle"
-                                  size={14}
-                                  color={StatusColors.pending.text}
-                                />
-                                <Text style={styles.breakReasonLabel}>
-                                  Reason
-                                </Text>
-                              </View>
-                              <Text style={styles.breakReasonText}>
-                                {pendingBreakRequest.reason}
-                              </Text>
-                            </View>
-                          )}
-
-                          {/* Footer Message */}
-                          <View style={styles.breakPendingFooter}>
-                            <MaterialCommunityIcons
-                              name="shield-check-outline"
-                              size={16}
-                              color={StatusColors.pending.text}
-                            />
-                            <Text style={styles.breakPendingFooterText}>
-                              Awaiting HR review and approval
-                            </Text>
-                          </View>
-                        </View>
-                      ) : !pendingBreakRequest &&
-                        !activeBreak &&
-                        !upcomingBreak ? (
-                        <TouchableOpacity
-                          activeOpacity={0.7}
-                          onPress={() => setShowBreakRequestModal(true)}
-                          style={styles.breakRequestButton}
-                          accessibilityLabel="Request a break"
-                          accessibilityRole="button"
-                          accessibilityHint="Opens modal to request a break from work"
-                        >
-                          <MaterialCommunityIcons
-                            name="coffee-outline"
-                            size={16}
-                            color={Colors.warning}
-                          />
-                          <Text style={styles.breakRequestButtonText}>
-                            Request Break
-                          </Text>
-                        </TouchableOpacity>
-                      ) : null}
-                    </>
-                  )}
-                </>
-              )}
-            </View>
-          </Animated.View>
-
-          {/* Quick Links Section */}
-          <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.modernSection}>
-            <View style={styles.modernSectionHeader}>
-              <Text style={styles.modernSectionTitle}>Quick Links</Text>
-            </View>
-
-            <View style={styles.quickActionsGrid}>
-              <Animated.View entering={FadeInDown.delay(200).springify()}>
-                <TouchableOpacity
-                  style={styles.quickActionItem}
-                  onPress={() => router.push("/(employee)/salary")}
-                  activeOpacity={PressOpacity.subtle}
-                  accessibilityLabel="View salary information"
-                  accessibilityRole="button"
-                >
-                  <View
-                    style={[
-                      styles.quickActionIcon,
-                      { backgroundColor: StatusColors.pending.background },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name="wallet"
-                      size={22}
-                      color={Colors.warning}
-                    />
-                  </View>
-                  <Text style={styles.quickActionLabel}>Salary</Text>
-                </TouchableOpacity>
-              </Animated.View>
-
-              <Animated.View entering={FadeInDown.delay(250).springify()}>
-                <TouchableOpacity
-                  style={styles.quickActionItem}
-                  onPress={() => router.push("/(employee)/leave")}
-                  activeOpacity={PressOpacity.subtle}
-                  accessibilityLabel="Manage leave requests"
-                  accessibilityRole="button"
-                >
-                  <View
-                    style={[
-                      styles.quickActionIcon,
-                      { backgroundColor: Colors.pinkLight },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name="beach"
-                      size={22}
-                      color={Colors.pink}
-                    />
-                  </View>
-                  <Text style={styles.quickActionLabel}>Leave</Text>
-                </TouchableOpacity>
-              </Animated.View>
-
-              <Animated.View entering={FadeInDown.delay(300).springify()}>
-                <TouchableOpacity
-                  style={styles.quickActionItem}
-                  onPress={() => router.push("/(employee)/breaks")}
-                  activeOpacity={PressOpacity.subtle}
-                  accessibilityLabel="View break history"
-                  accessibilityRole="button"
-                >
-                  <View
-                    style={[
-                      styles.quickActionIcon,
-                      { backgroundColor: Colors.cyanLight },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name="coffee"
-                      size={22}
-                      color={Colors.cyan}
-                    />
-                  </View>
-                  <Text style={styles.quickActionLabel}>Breaks</Text>
-                </TouchableOpacity>
-              </Animated.View>
-
-              <Animated.View entering={FadeInDown.delay(350).springify()}>
-                <TouchableOpacity
-                  style={styles.quickActionItem}
-                  onPress={() =>
-                    router.push("/(employee)/change-employer" as Href)
-                  }
-                  activeOpacity={PressOpacity.subtle}
-                  accessibilityLabel="Change employer"
-                  accessibilityRole="button"
-                >
-                  <View
-                    style={[
-                      styles.quickActionIcon,
-                      { backgroundColor: StatusColors.info.background },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name="swap-horizontal"
-                      size={22}
-                      color={Colors.infoDark}
-                    />
-                  </View>
-                  <Text style={styles.quickActionLabel}>Change Employer</Text>
-                </TouchableOpacity>
-              </Animated.View>
-
-              <Animated.View entering={FadeInDown.delay(400).springify()}>
-                <TouchableOpacity
-                  style={styles.quickActionItem}
-                  onPress={() =>
-                    router.push("/(employee)/search-employer" as Href)
-                  }
-                  activeOpacity={PressOpacity.subtle}
-                  accessibilityLabel="Search for employer"
-                  accessibilityRole="button"
-                >
-                  <View
-                    style={[
-                      styles.quickActionIcon,
-                      { backgroundColor: Colors.indigoLight },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name="magnify"
-                      size={22}
-                      color={Colors.indigo}
-                    />
-                  </View>
-                  <Text style={styles.quickActionLabel}>Search Employer</Text>
-                </TouchableOpacity>
-              </Animated.View>
-
-              <Animated.View entering={FadeInDown.delay(450).springify()}>
-                <TouchableOpacity
-                  style={styles.quickActionItem}
-                  onPress={() =>
-                    router.push("/(employee)/employment-history" as Href)
-                  }
-                  activeOpacity={PressOpacity.subtle}
-                  accessibilityLabel="View employment history"
-                  accessibilityRole="button"
-                >
-                  <View
-                    style={[
-                      styles.quickActionIcon,
-                      { backgroundColor: Colors.purpleLight },
-                    ]}
-                  >
-                    <Ionicons name="time" size={22} color={Colors.purple} />
-                  </View>
-                  <Text style={styles.quickActionLabel}>History</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            </View>
-          </Animated.View>
-
-          {/* Feature Banner - Glass Variant */}
-          <Animated.View entering={FadeInDown.delay(250).springify()} style={styles.bannerSlot}>
-            <MarketingBanner
-              variant="glass"
-              title="Salary Insights"
-              subtitle="Track your earnings and view payment history"
-              ctaText="View Details"
-              onPress={() => router.push("/(employee)/salary")}
-            />
-          </Animated.View>
-
-          {/* Monthly Summary */}
-          <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.modernSection}>
-            <View style={styles.modernSectionHeader}>
-              <Text style={styles.modernSectionTitle}>
-                This Month&apos;s Summary
+        {/* Welcome Section for New Employees */}
+        {isNewEmployee && (
+          <Animated.View
+            entering={FadeInDown.delay(500).springify()}
+            style={styles.welcomeSection}
+          >
+            <View style={styles.welcomeHeader}>
+              <Text style={styles.welcomeTitle}>Welcome to Vyapaar Sewa!</Text>
+              <Text style={styles.welcomeSubtitle}>
+                Here's what you can do with the app
               </Text>
             </View>
 
-            {loadingMonthly ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color={Colors.primary} />
-              </View>
-            ) : (
-              <View style={styles.infoRow}>
-                <View style={styles.infoItem}>
-                  <MaterialCommunityIcons
-                    name="calendar-check"
-                    size={16}
-                    color={Colors.success}
-                  />
-                  <Text style={styles.infoValue}>
-                    {monthlySummary?.totalDays || 0}
-                  </Text>
-                  <Text style={styles.infoLabel}>Present</Text>
-                </View>
+            <FeatureCard
+              icon="clock-check-outline"
+              iconColor={Colors.primary}
+              iconBg={Colors.primaryLight}
+              title="Track Attendance"
+              description="Check in/out with one tap and track your work hours"
+              onPress={() => router.push("/(employee)/attendance")}
+            />
 
-                <View style={styles.infoDivider} />
+            <FeatureCard
+              icon="palm-tree"
+              iconColor={Colors.pink}
+              iconBg={Colors.pinkLight}
+              title="Request Leave"
+              description="Apply for time off and track your leave balance"
+              onPress={() => router.push("/(employee)/leave")}
+            />
 
-                <View style={styles.infoItem}>
-                  <MaterialCommunityIcons
-                    name="check-circle-outline"
-                    size={16}
-                    color={Colors.info}
-                  />
-                  <Text style={styles.infoValue}>
-                    {monthlySummary?.validDays || 0}
-                  </Text>
-                  <Text style={styles.infoLabel}>Valid</Text>
-                </View>
+            <FeatureCard
+              icon="wallet"
+              iconColor={Colors.warning}
+              iconBg={Colors.warningLight}
+              title="View Salary"
+              description="Check your earnings, deductions, and payment history"
+              onPress={() => router.push("/(employee)/salary")}
+            />
 
-                <View style={styles.infoDivider} />
-
-                <View style={styles.infoItem}>
-                  <MaterialCommunityIcons
-                    name="clock-outline"
-                    size={16}
-                    color={Colors.primary}
-                  />
-                  <Text style={styles.infoValue}>
-                    {Math.round(monthlySummary?.totalHours || 0)}h
-                  </Text>
-                  <Text style={styles.infoLabel}>Hours</Text>
-                </View>
-              </View>
-            )}
-          </Animated.View>
-
-          {/* Calendar Heatmap */}
-          {monthlySummary?.records && monthlySummary.records.length > 0 && (
-            <Animated.View entering={FadeInDown.delay(350).springify()} style={styles.modernSection}>
-              <View style={styles.modernSectionHeader}>
-                <Text style={styles.modernSectionTitle}>
-                  Attendance Calendar
-                </Text>
-              </View>
-
-              <MiniCalendarHeatmap
-                records={monthlySummary.records}
-                month={new Date().getMonth()}
-                year={new Date().getFullYear()}
-              />
-            </Animated.View>
-          )}
-
-          {/* Monthly Earnings */}
-          {user?.base_salary != null && user.base_salary > 0 && (
-            <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.modernSection}>
-              <View style={styles.modernSectionHeader}>
-                <Text style={styles.modernSectionTitle}>
-                  This Month&apos;s Earnings
-                </Text>
-              </View>
-
-              {loadingEarnings ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color={Colors.primary} />
-                </View>
-              ) : (
-                <CircularHoursProgress
-                  hoursWorked={earnings?.total_hours_worked || 0}
-                  expectedHours={earnings?.expected_hours || 0}
-                />
-              )}
-            </Animated.View>
-          )}
-
-          {/* Placeholder Banner - Coming Soon */}
-          <Animated.View entering={FadeInDown.delay(450).springify()} style={styles.bannerSlot}>
-            <PlaceholderBanner
-              title="Documents Hub"
-              subtitle="Upload and manage your documents securely"
-              icon="document-text-outline"
-              gradientColors={[Colors.indigo, Colors.purple]}
+            <FeatureCard
+              icon="coffee"
+              iconColor={Colors.cyan}
+              iconBg={Colors.cyanLight}
+              title="Manage Breaks"
+              description="Request breaks and view your break history"
+              onPress={() => router.push("/(employee)/breaks")}
             />
           </Animated.View>
+        )}
 
-          {/* Latest Salary */}
-          <Animated.View entering={FadeInDown.delay(500).springify()} style={styles.modernSection}>
-            <View style={styles.modernSectionHeader}>
-              <Text style={styles.modernSectionTitle}>Latest Salary</Text>
+        {/* Explore More Section */}
+        <Animated.View
+          entering={FadeInDown.delay(550).springify()}
+          style={styles.exploreSection}
+        >
+          <Text style={styles.sectionTitle}>Explore</Text>
+          <View style={styles.exploreGrid}>
+            <TouchableOpacity
+              style={styles.exploreCard}
+              onPress={() => router.push("/(employee)/attendance")}
+              activeOpacity={0.7}
+            >
+              <LinearGradient
+                colors={["#6366F1", "#8B5CF6"]}
+                style={styles.exploreCardGradient}
+              >
+                <Ionicons name="stats-chart" size={28} color="#FFFFFF" />
+                <Text style={styles.exploreCardTitle}>Attendance</Text>
+                <Text style={styles.exploreCardSubtitle}>View history</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.exploreCard}
+              onPress={() => router.push("/(employee)/leave")}
+              activeOpacity={0.7}
+            >
+              <LinearGradient
+                colors={["#EC4899", "#F472B6"]}
+                style={styles.exploreCardGradient}
+              >
+                <Ionicons name="airplane" size={28} color="#FFFFFF" />
+                <Text style={styles.exploreCardTitle}>Leave</Text>
+                <Text style={styles.exploreCardSubtitle}>Plan time off</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+
+        {/* Help & Support */}
+        <Animated.View
+          entering={FadeInDown.delay(600).springify()}
+          style={styles.helpSection}
+        >
+          <TouchableOpacity
+            style={styles.helpCard}
+            onPress={() => router.push("/profile")}
+            activeOpacity={0.7}
+          >
+            <View style={styles.helpIconWrapper}>
+              <Ionicons name="help-circle-outline" size={24} color={Colors.info} />
             </View>
+            <View style={styles.helpContent}>
+              <Text style={styles.helpTitle}>Need Help?</Text>
+              <Text style={styles.helpSubtitle}>
+                View settings, update profile, or contact support
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={Colors.gray400} />
+          </TouchableOpacity>
+        </Animated.View>
 
-            {loadingSalary ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color={Colors.primary} />
-              </View>
-            ) : latestSalary ? (
-              <View style={styles.card}>
-                <View style={styles.salaryHeaderSection}>
-                  <Text style={styles.salaryHeaderLabel}>Total Amount</Text>
-                  <Text
-                    style={styles.salaryHeaderValue}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.7}
-                  >
-                    {formatCurrency(latestSalary.total_salary || 0)}
-                  </Text>
-                </View>
-
-                <View style={styles.divider} />
-
-                <View style={styles.listItem}>
-                  <View style={styles.listItemWithIcon}>
-                    <MaterialCommunityIcons
-                      name="calendar-month"
-                      size={18}
-                      color={Colors.textSecondary}
-                    />
-                    <Text style={styles.listLabel}>Month</Text>
-                  </View>
-                  <Text style={styles.listValue}>
-                    {latestSalary.month_year}
-                  </Text>
-                </View>
-
-                <View style={styles.divider} />
-
-                <View style={styles.listItem}>
-                  <View style={styles.listItemWithIcon}>
-                    <MaterialCommunityIcons
-                      name="information-outline"
-                      size={18}
-                      color={Colors.textSecondary}
-                    />
-                    <Text style={styles.listLabel}>Status</Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.statusBadgeInline,
-                      latestSalary.status === "paid"
-                        ? styles.statusPaid
-                        : latestSalary.status === "approved"
-                        ? styles.statusApproved
-                        : styles.statusPending,
-                    ]}
-                  >
-                    <Text style={styles.statusText}>{latestSalary.status}</Text>
-                  </View>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.salaryEmptyState}>
-                <MaterialCommunityIcons
-                  name="receipt-text-outline"
-                  size={48}
-                  color={Colors.gray300}
-                />
-                <Text style={styles.salaryEmptyStateTitle}>
-                  No Salary Records
-                </Text>
-                <Text style={styles.salaryEmptyStateText}>
-                  Your salary information will appear here once processed by HR
-                </Text>
-              </View>
-            )}
-          </Animated.View>
-        </View>
+        {/* Bottom spacing */}
+        <View style={{ height: 40 }} />
       </ScrollView>
 
       {/* Break Request Modal */}
@@ -1584,146 +1423,262 @@ export default function EmployeeDashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: "#F8F9FA",
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 120,
-    paddingHorizontal: Spacing["2xl"],
-    gap: Spacing["lg"],
+    paddingBottom: 100,
   },
-  heroSection: {
-    marginHorizontal: -Spacing["2xl"],
-    paddingHorizontal: Spacing["2xl"],
-    paddingTop: Spacing["6xl"],
-    paddingBottom: Spacing["3xl"],
+
+  // Hero Section
+  heroGradient: {
+    paddingTop: Spacing["6xl"] + Spacing.md,
+    paddingBottom: Spacing["2xl"],
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
-    gap: Spacing["xl"],
   },
-  heroHeaderRow: {
+
+  // Top Bar
+  topBar: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    gap: Spacing["xl"],
+    paddingHorizontal: Spacing.xl,
+    marginBottom: Spacing.lg,
   },
-  heroTextBlock: {
-    flex: 1,
-    gap: Spacing["xs"],
+  greetingSection: {
+    gap: 2,
   },
-  heroGreetingSmall: {
+  greetingText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "500",
     color: "rgba(255,255,255,0.8)",
-    letterSpacing: 0.5,
   },
-  heroGreeting: {
-    fontSize: 32,
+  nameText: {
+    fontSize: 24,
     fontWeight: "800",
-    color: Colors.textInverse,
-    letterSpacing: -1,
+    color: "#FFFFFF",
+    letterSpacing: -0.5,
   },
-  heroDatePill: {
+  topBarActions: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
-    gap: 6,
+    gap: Spacing.sm,
+  },
+  topBarButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 6,
-    borderRadius: BorderRadius.full,
-    marginTop: Spacing.xs,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  heroDateText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "rgba(255,255,255,0.9)",
-  },
-  avatarButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.4)",
+  avatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: "rgba(255,255,255,0.3)",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.4)",
   },
-  avatarLetter: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
-    color: Colors.textInverse,
+  avatarText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
-  heroMetricsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: Spacing["sm"],
-    rowGap: 8,
-    columnGap: Spacing["md"],
+
+  // Status Pill
+  statusPillContainer: {
+    alignItems: "center",
+    marginBottom: Spacing.lg,
   },
-  heroMetricCard: {
-    flex: 1,
-    minWidth: 160,
-    flexBasis: "48%",
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 14,
-    gap: 10,
+  statusPill: {
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 84,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.06)",
-    backgroundColor: Colors.background,
-    ...Shadows.sm,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 8,
   },
-  heroMetricPrimary: {
-    // Optional: slight tint for primary cards
+  statusDotStatic: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
-  heroMetricSecondary: {
-    // Optional: slight tint for secondary cards
+  statusPillText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
-  heroMetricIcon: {
-    width: 38,
-    height: 38,
+  streakBadgeSmall: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.3)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 12,
+    gap: 3,
+    marginLeft: 4,
+  },
+  streakBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+
+  // Check In Section
+  checkInSection: {
+    alignItems: "center",
+    paddingHorizontal: Spacing.xl,
+  },
+  loadingCheckIn: {
+    height: 180,
     justifyContent: "center",
     alignItems: "center",
   },
-  heroMetricIconOverlay: {
-    backgroundColor: Colors.primary + "20",
+  checkInButtonWrapper: {
+    alignItems: "center",
   },
-  heroMetricContent: {
-    flex: 1,
-    flexShrink: 1,
-    gap: Spacing["xs"],
-    minWidth: 0,
+
+  // Day Off
+  dayOffContainer: {
+    alignItems: "center",
+    paddingVertical: Spacing.xl,
   },
-  heroMetricLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: Colors.textSecondary,
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
+  dayOffIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: Spacing.md,
   },
-  heroMetricValue: {
+  dayOffTitle: {
     fontSize: 22,
     fontWeight: "700",
-    color: Colors.text,
-    letterSpacing: -0.5,
+    color: "#FFFFFF",
+    marginBottom: 4,
   },
-  content: {
-    gap: Spacing["lg"],
+  dayOffSubtitle: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.8)",
+    textAlign: "center",
+    paddingHorizontal: Spacing.xl,
   },
-  bannerSlot: {
-    marginHorizontal: -Spacing["2xl"],
+
+  // Completed Day
+  completedDayContainer: {
+    alignItems: "center",
+    paddingVertical: Spacing.lg,
   },
+  completedIcon: {
+    marginBottom: Spacing.sm,
+  },
+  completedTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: Spacing.md,
+  },
+  completedStats: {
+    flexDirection: "row",
+    gap: Spacing["2xl"],
+  },
+  completedStatItem: {
+    alignItems: "center",
+  },
+  completedStatValue: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+  completedStatLabel: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.7)",
+    marginTop: 2,
+  },
+
+  // Break Container
+  breakContainer: {
+    alignItems: "center",
+    paddingVertical: Spacing.lg,
+  },
+  breakIconWrapper: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  breakTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 4,
+  },
+  breakTime: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.8)",
+    marginBottom: Spacing.md,
+  },
+  endBreakButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    gap: 8,
+  },
+  endBreakButtonText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#FF6B35",
+  },
+
+  // Today Time Row
+  todayTimeRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: Spacing.xl,
+    paddingHorizontal: Spacing.xl,
+    gap: Spacing.lg,
+  },
+  timeInfoItem: {
+    alignItems: "center",
+    gap: 4,
+  },
+  timeInfoLabel: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.7)",
+    fontWeight: "500",
+  },
+  timeInfoValue: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  timeInfoDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: "rgba(255,255,255,0.3)",
+  },
+
+  // Error Banner
   errorBanner: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.errorLight,
+    backgroundColor: "#FEE2E2",
+    marginHorizontal: Spacing.xl,
+    marginTop: Spacing.md,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.lg,
@@ -1735,257 +1690,410 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: "500",
-    color: Colors.errorDark,
+    color: "#991B1B",
   },
   retryText: {
     fontSize: 14,
     fontWeight: "600",
     color: Colors.error,
   },
-  modernSection: {
-    gap: Spacing["md"],
-  },
-  modernSectionHeader: {
+
+  // Date Card
+  dateCard: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: Spacing["sm"],
-  },
-  headerBadgesRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: Spacing.xl,
+    marginTop: -Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: 16,
     gap: Spacing.sm,
-  },
-  modernSectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: Colors.text,
-    letterSpacing: -0.3,
-  },
-  card: {
-    backgroundColor: Colors.background,
-    borderRadius: 14,
-    padding: Spacing["md"],
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.08)",
     ...Shadows.sm,
   },
-  liveBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.successLight,
-    paddingHorizontal: Spacing["md"],
-    paddingVertical: Spacing["xs"],
-    borderRadius: BorderRadius.full,
-    gap: Spacing["xs"],
-  },
-  pulseDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.success,
-  },
-  liveText: {
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.semibold,
-    color: StatusColors.approved.text,
-  },
-  loadingContainer: {
-    paddingVertical: Spacing["2xl"],
+  dateIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: "center",
     alignItems: "center",
   },
-  attendanceInfo: {
-    flexDirection: "row",
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
-  timeCard: {
+  dateText: {
     flex: 1,
-    flexDirection: "column",
-    alignItems: "center",
-    backgroundColor: Colors.backgroundSecondary,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    gap: Spacing.xs,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.06)",
-    ...Shadows.xs,
+    fontSize: 15,
+    fontWeight: "600",
+    color: Colors.text,
   },
-  timeCardContent: {
-    alignItems: "center",
-  },
-  timeCardLabel: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    fontWeight: "500",
-    marginBottom: 2,
-    textAlign: "center",
-  },
-  timeCardValue: {
-    fontSize: 16,
+
+  // Section Title
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: "700",
     color: Colors.text,
-    textAlign: "center",
-    letterSpacing: -0.3,
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.xl,
   },
-  hoursValue: {
-    color: Colors.primary,
+
+  // Quick Actions
+  quickActionsSection: {
+    marginTop: Spacing.xl,
   },
-  overtimeIndicator: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: Colors.purple,
-    marginTop: 1,
+  quickActionsScroll: {
+    paddingHorizontal: Spacing.xl,
+    gap: Spacing.sm,
   },
-  emptyStateContainer: {
-    paddingVertical: 40,
+  quickActionCard: {
     alignItems: "center",
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    marginRight: Spacing.sm,
+    ...Shadows.sm,
+  },
+  quickActionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  quickActionLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: Colors.text,
+  },
+
+  // Context Actions
+  contextActionsRow: {
+    flexDirection: "row",
+    paddingHorizontal: Spacing.xl,
+    marginTop: Spacing.md,
+    gap: Spacing.sm,
+  },
+  contextActionButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: StatusColors.pending.background,
+    paddingVertical: Spacing.md,
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: StatusColors.pending.border,
+  },
+  contextActionText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: StatusColors.pending.text,
+  },
+
+  // Pending Break Card
+  pendingBreakCard: {
+    marginHorizontal: Spacing.xl,
+    marginTop: Spacing.md,
+    backgroundColor: StatusColors.pending.background,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: StatusColors.pending.border,
+    overflow: "hidden",
+  },
+  pendingBreakHeader: {
+    backgroundColor: "rgba(245, 158, 11, 0.1)",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: StatusColors.pending.border,
+  },
+  pendingBreakBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  pendingBreakBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: StatusColors.pending.text,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  pendingBreakContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
     gap: 12,
   },
-  primaryButton: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 12,
-    paddingHorizontal: Spacing["lg"],
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: Spacing["xs"],
-    ...Shadows.primary,
-  },
-  primaryButtonText: {
-    color: Colors.textInverse,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  checkOutButton: {
-    backgroundColor: Colors.error,
-    paddingVertical: 12,
-    paddingHorizontal: Spacing["lg"],
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: Spacing["xs"],
-    shadowColor: Colors.error,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  checkOutButtonText: {
-    color: Colors.textInverse,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  checkOutButtonDisabled: {
-    opacity: 0.5,
-    backgroundColor: Colors.gray400,
-  },
-  breakDeductionText: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    marginBottom: 8,
-    fontStyle: "italic",
-    textAlign: "center",
-  },
-  // Neumorphic Button Styles
-  neumorphicButtonContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: Spacing["2xl"],
-    paddingHorizontal: Spacing["xl"],
-    marginVertical: Spacing["sm"],
-  },
-  breakBlockedContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing["sm"],
-    paddingVertical: Spacing["lg"],
-    paddingHorizontal: Spacing["xl"],
-    backgroundColor: Colors.gray100,
-    borderRadius: BorderRadius["xl"],
-    marginVertical: Spacing["sm"],
-  },
-  breakBlockedIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.gray200,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  breakBlockedText: {
+  pendingBreakInfo: {
     flex: 1,
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.medium,
-    color: Colors.gray500,
   },
-  // Info Row Styles (for compact stats)
-  infoRow: {
+  pendingBreakTime: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: StatusColors.pending.text,
+  },
+  pendingBreakReason: {
+    fontSize: 13,
+    color: StatusColors.pending.text,
+    marginTop: 2,
+    opacity: 0.8,
+  },
+
+  // Overtime Section
+  overtimeSection: {
+    marginHorizontal: Spacing.xl,
+    marginTop: Spacing.md,
+  },
+  overtimePendingCard: {
+    backgroundColor: StatusColors.pending.background,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: StatusColors.pending.border,
+    overflow: "hidden",
+  },
+  overtimePendingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(245, 158, 11, 0.1)",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: StatusColors.pending.border,
+  },
+  overtimePendingBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: StatusColors.pending.text,
+    textTransform: "uppercase",
+  },
+  overtimePendingContent: {
+    padding: 12,
+  },
+  overtimePendingHours: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: StatusColors.pending.text,
+  },
+  overtimePendingReason: {
+    fontSize: 13,
+    color: StatusColors.pending.text,
+    marginTop: 4,
+    opacity: 0.8,
+  },
+  overtimeApprovedCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.purpleLight,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 12,
+  },
+  overtimeApprovedInfo: {
+    flex: 1,
+  },
+  overtimeApprovedLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: Colors.purple,
+  },
+  overtimeApprovedValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.purple,
+  },
+  overtimeRejectedCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.errorLight,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  overtimeRejectedText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: Colors.error,
+  },
+  addOvertimeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 10,
+    ...Shadows.sm,
+  },
+  addOvertimeText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "600",
+    color: Colors.purple,
+  },
+
+  // Progress Card
+  progressCard: {
+    marginHorizontal: Spacing.xl,
+    marginTop: Spacing.lg,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: Spacing.lg,
+    ...Shadows.sm,
+  },
+  progressCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  progressCardTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.text,
+  },
+  loadingSmall: {
+    paddingVertical: Spacing.xl,
+    alignItems: "center",
+  },
+  progressStats: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-around",
-    backgroundColor: Colors.background,
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: Spacing.lg,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.08)",
-    ...Shadows.sm,
+    paddingVertical: Spacing.md,
   },
-  infoItem: {
+  progressStatItem: {
     flex: 1,
     alignItems: "center",
-    gap: Spacing.xs,
   },
-  infoValue: {
-    fontSize: 22,
-    fontWeight: "700",
+  progressStatValue: {
+    fontSize: 24,
+    fontWeight: "800",
     color: Colors.text,
     letterSpacing: -0.5,
   },
-  infoLabel: {
+  progressStatLabel: {
     fontSize: 12,
     fontWeight: "500",
     color: Colors.textSecondary,
     marginTop: 2,
   },
-  infoDivider: {
+  progressStatDivider: {
     width: 1,
-    height: 36,
-    backgroundColor: "rgba(0,0,0,0.06)",
+    height: 32,
+    backgroundColor: Colors.border,
   },
-  // Salary Styles
-  salaryHeaderSection: {
-    alignItems: "center",
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.lg,
-    backgroundColor: Colors.backgroundSecondary,
+  heatmapWrapper: {
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
   },
-  salaryHeaderLabel: {
-    fontSize: Typography.fontSize.xs,
-    color: Colors.textSecondary,
-    fontWeight: Typography.fontWeight.semibold,
-    marginBottom: Spacing.xs,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  salaryHeaderValue: {
-    fontSize: Typography.fontSize["3xl"],
-    fontWeight: Typography.fontWeight.bold,
-    color: Colors.primary,
-  },
-  listItemWithIcon: {
+
+  // Employer Card
+  employerCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.sm,
+    justifyContent: "space-between",
+    marginHorizontal: Spacing.xl,
+    marginTop: Spacing.md,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: Spacing.md,
+    ...Shadows.sm,
   },
-  statusBadgeInline: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.lg,
+  employerCardLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: Spacing.md,
+  },
+  employerIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: Colors.primaryLight,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  employerInfo: {
+    flex: 1,
+  },
+  employerName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: Colors.text,
+  },
+  employerDuration: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  changeEmployerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: Colors.infoLight,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  // Earnings Card
+  earningsCard: {
+    marginHorizontal: Spacing.xl,
+    marginTop: Spacing.md,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    ...Shadows.sm,
+  },
+  earningsCardContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+    gap: Spacing.md,
+  },
+  earningsLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: Spacing.md,
+  },
+  earningsIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: Colors.warningLight,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  earningsInfo: {
+    flex: 1,
+  },
+  earningsLabel: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: "500",
+  },
+  earningsValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.text,
+    marginTop: 2,
+  },
+  earningsStatus: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  earningsStatusText: {
+    fontSize: 11,
+    fontWeight: "600",
+    textTransform: "capitalize",
+    color: Colors.text,
   },
   statusPaid: {
     backgroundColor: Colors.successLight,
@@ -1996,529 +2104,158 @@ const styles = StyleSheet.create({
   statusPending: {
     backgroundColor: Colors.warningLight,
   },
-  statusText: {
-    fontSize: 14,
-    fontWeight: "600",
-    textTransform: "capitalize",
-    color: Colors.text,
+
+  // Tip Section
+  tipSection: {
+    marginHorizontal: Spacing.xl,
+    marginTop: Spacing.lg,
   },
-  nonWorkingDayContainer: {
-    backgroundColor: StatusColors.pending.background,
-    padding: Spacing.xl,
-    borderRadius: BorderRadius.lg,
-    alignItems: "center",
-    gap: Spacing.sm,
-    borderWidth: 1,
-    borderColor: StatusColors.pending.border,
-    ...Shadows.sm,
-  },
-  nonWorkingDayTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: StatusColors.pending.text,
-    marginTop: 8,
-  },
-  nonWorkingDayText: {
-    fontSize: 14,
-    color: StatusColors.pending.text,
-    textAlign: "center",
-  },
-  workingDaysText: {
-    fontSize: 13,
-    color: StatusColors.pending.text,
-    fontWeight: "600",
-    marginTop: 4,
-    textAlign: "center",
-  },
-  breakRequestButton: {
-    backgroundColor: StatusColors.pending.background,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.md,
-    alignItems: "center",
-    justifyContent: "center",
+  tipCard: {
     flexDirection: "row",
-    gap: 6,
-    marginTop: Spacing.sm,
-    borderWidth: 1,
-    borderColor: StatusColors.pending.border,
-    ...Shadows.xs,
-  },
-  breakRequestButtonDisabled: {
-    backgroundColor: Colors.gray100,
-    borderColor: Colors.border,
-    opacity: 0.7,
-  },
-  breakRequestButtonText: {
-    color: StatusColors.pending.text,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  breakRequestButtonTextDisabled: {
-    color: Colors.gray400,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  upcomingBreakCard: {
-    backgroundColor: Colors.infoLight,
+    alignItems: "center",
+    padding: Spacing.md,
     borderRadius: 16,
-    padding: 0,
-    marginTop: 12,
-    borderWidth: 2,
-    borderColor: Colors.info,
-    overflow: "hidden",
-    shadowColor: Colors.info,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  ongoingBreakCard: {
-    backgroundColor: StatusColors.active.background,
-    borderRadius: 16,
-    padding: 0,
-    marginTop: 12,
-    borderWidth: 2,
-    borderColor: StatusColors.active.border,
-    overflow: "hidden",
-    shadowColor: Colors.success,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  pendingBreakCard: {
-    backgroundColor: StatusColors.pending.background,
-    borderRadius: 16,
-    padding: 0,
-    marginTop: 12,
-    borderWidth: 2,
-    borderColor: StatusColors.pending.border,
-    overflow: "hidden",
-    shadowColor: Colors.warning,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  upcomingStatusBadge: {
-    backgroundColor: Colors.infoLight,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.info,
-  },
-  pulseDotBlue: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.info,
-  },
-  upcomingStatusText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: Colors.infoDark,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  ongoingStatusBadge: {
-    backgroundColor: StatusColors.active.background,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: StatusColors.active.border,
-  },
-  pulseDotGreen: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.success,
-  },
-  ongoingStatusText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: Colors.successDark,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  pendingStatusBadge: {
-    backgroundColor: StatusColors.pending.background,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: StatusColors.pending.border,
-  },
-  pulseDotOrange: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.warning,
-  },
-  pendingStatusText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: StatusColors.pending.text,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  breakTimeDisplay: {
-    padding: Spacing.lg,
     gap: Spacing.md,
   },
-  breakTimeMain: {
-    flexDirection: "row",
+  tipIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
     alignItems: "center",
-    gap: 16,
   },
-  breakTimeInfo: {
+  tipContent: {
     flex: 1,
   },
-  breakTimeLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: StatusColors.pending.text,
-    marginBottom: 6,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  breakTimeValue: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: StatusColors.pending.text,
-    letterSpacing: -0.5,
-  },
-  breakDurationBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: StatusColors.pending.background,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: StatusColors.pending.border,
-  },
-  breakDurationText: {
+  tipTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: Colors.warning,
+    color: "#FFFFFF",
+    marginBottom: 2,
   },
-  breakReasonContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  breakReasonHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 8,
-  },
-  breakReasonLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: StatusColors.pending.text,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  breakReasonText: {
-    fontSize: 14,
-    color: StatusColors.pending.text,
-    lineHeight: 20,
-    fontWeight: "500",
-  },
-  breakPendingFooter: {
-    backgroundColor: StatusColors.pending.border,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  breakPendingFooterText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: StatusColors.pending.text,
-  },
-  breakActionContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  endBreakButton: {
-    backgroundColor: Colors.success,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
-    shadowColor: Colors.success,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  endBreakButtonText: {
-    color: Colors.textInverse,
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  // Salary Empty State
-  salaryEmptyState: {
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: BorderRadius.xl,
-    paddingVertical: Spacing["3xl"],
-    paddingHorizontal: Spacing["xl"],
-    alignItems: "center",
-    gap: Spacing["sm"],
-  },
-  salaryEmptyStateTitle: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.text,
-    marginTop: Spacing["xs"],
-  },
-  salaryEmptyStateText: {
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.medium,
-    color: Colors.textSecondary,
-    textAlign: "center",
-    lineHeight: 20,
+  tipText: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.9)",
+    lineHeight: 18,
   },
 
-  // Quick Actions Section
-  quickActionsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing["sm"],
-  },
-  quickActionItem: {
-    width: "31%",
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.xl,
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.sm,
-    alignItems: "center",
+  // Welcome Section
+  welcomeSection: {
+    marginHorizontal: Spacing.xl,
+    marginTop: Spacing.xl,
     gap: Spacing.sm,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.08)",
-    ...Shadows.xs,
   },
-  quickActionIcon: {
+  welcomeHeader: {
+    marginBottom: Spacing.md,
+  },
+  welcomeTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: Colors.text,
+    marginBottom: 4,
+  },
+  welcomeSubtitle: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+
+  // Feature Card
+  featureCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    padding: Spacing.md,
+    borderRadius: 14,
+    gap: Spacing.md,
+    ...Shadows.sm,
+  },
+  featureIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  featureContent: {
+    flex: 1,
+  },
+  featureTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: Colors.text,
+    marginBottom: 2,
+  },
+  featureDescription: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+
+  // Explore Section
+  exploreSection: {
+    marginTop: Spacing.xl,
+  },
+  exploreGrid: {
+    flexDirection: "row",
+    paddingHorizontal: Spacing.xl,
+    gap: Spacing.md,
+  },
+  exploreCard: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: "hidden",
+    ...Shadows.sm,
+  },
+  exploreCardGradient: {
+    padding: Spacing.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    height: 120,
+    gap: 8,
+  },
+  exploreCardTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  exploreCardSubtitle: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.8)",
+  },
+
+  // Help Section
+  helpSection: {
+    marginHorizontal: Spacing.xl,
+    marginTop: Spacing.lg,
+  },
+  helpCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    padding: Spacing.md,
+    borderRadius: 14,
+    gap: Spacing.md,
+    ...Shadows.sm,
+  },
+  helpIconWrapper: {
     width: 44,
     height: 44,
     borderRadius: 12,
+    backgroundColor: Colors.infoLight,
     justifyContent: "center",
     alignItems: "center",
   },
-  quickActionLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: Colors.text,
-    textAlign: "center",
-    lineHeight: 15,
-    letterSpacing: -0.1,
-  },
-  emptyStateText: {
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.medium,
-    color: Colors.textSecondary,
-    textAlign: "center",
-  },
-  divider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginVertical: Spacing.sm,
-  },
-  listItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: Spacing.xs,
-  },
-  listLabel: {
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.medium,
-    color: Colors.textSecondary,
-  },
-  listValue: {
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.text,
-  },
-  // Overtime styles
-  addOvertimeButton: {
-    backgroundColor: StatusColors.overtime.background,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.md,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 6,
-    marginTop: Spacing.sm,
-    borderWidth: 1,
-    borderColor: StatusColors.overtime.border,
-    ...Shadows.xs,
-  },
-  addOvertimeButtonText: {
-    color: Colors.purple,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  overtimeDisplayCard: {
-    backgroundColor: StatusColors.overtime.background,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: StatusColors.overtime.border,
-    marginTop: Spacing.sm,
-    ...Shadows.xs,
-  },
-  overtimeDisplayHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  overtimeDisplayLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: Colors.purple,
-  },
-  overtimeDisplayValue: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: StatusColors.overtime.text,
-    marginLeft: "auto",
-  },
-  overtimeDisplayReason: {
-    fontSize: 12,
-    color: Colors.purple,
-    marginTop: 4,
-  },
-  editOvertimeButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    gap: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: Colors.indigoLight,
-    borderRadius: 8,
-  },
-  editOvertimeButtonText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: Colors.purple,
-  },
-  // Overtime Pending Styles
-  overtimePendingCard: {
-    backgroundColor: StatusColors.pending.background,
-    borderRadius: 12,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: StatusColors.pending.border,
-    overflow: "hidden",
-  },
-  overtimePendingHeader: {
-    backgroundColor: StatusColors.pending.background,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: StatusColors.pending.border,
-  },
-  overtimePendingLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: StatusColors.pending.text,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  overtimePendingContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    gap: 12,
-  },
-  overtimePendingInfo: {
+  helpContent: {
     flex: 1,
   },
-  overtimePendingHours: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: StatusColors.pending.text,
-  },
-  overtimePendingReason: {
-    fontSize: 13,
-    color: StatusColors.pending.text,
-    marginTop: 4,
-  },
-  overtimePendingFooter: {
-    backgroundColor: StatusColors.pending.border,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
-  overtimePendingFooterText: {
-    fontSize: 11,
+  helpTitle: {
+    fontSize: 15,
     fontWeight: "600",
-    color: StatusColors.pending.text,
+    color: Colors.text,
   },
-  // Overtime Rejected Styles
-  overtimeRejectedCard: {
-    backgroundColor: StatusColors.rejected.background,
-    borderRadius: 12,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: StatusColors.rejected.border,
-    overflow: "hidden",
-  },
-  overtimeRejectedHeader: {
-    backgroundColor: StatusColors.rejected.background,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: StatusColors.rejected.border,
-  },
-  overtimeRejectedLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: StatusColors.rejected.text,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  overtimeRejectedContent: {
-    padding: 12,
-  },
-  overtimeRejectedHours: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: StatusColors.rejected.text,
-  },
-  overtimeRejectedReason: {
+  helpSubtitle: {
     fontSize: 13,
-    color: Colors.errorDark,
-    marginTop: 6,
-    fontStyle: "italic",
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
 });
