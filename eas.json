@@ -31,7 +31,8 @@
     },
     "production": {
       "autoIncrement": true,
-      "distribution": "internal",
+      "distribution": "store",
+      "credentialsSource": "local",
       "android": {
         "buildType": "apk"
       },

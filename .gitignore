@@ -48,3 +48,6 @@ app-example
 
 
 /firebase-service-account.json
+
+# EAS local credentials
+credentials.json
