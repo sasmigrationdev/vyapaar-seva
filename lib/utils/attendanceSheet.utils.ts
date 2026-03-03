@@ -1,9 +1,7 @@
 import { supabase } from '@/lib/supabase/client';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { Paths, File } from 'expo-file-system';
-import * as MediaLibrary from 'expo-media-library';
-import { Platform, Alert } from 'react-native';
+import { Platform } from 'react-native';
 
 /**
  * Interface for attendance report data
@@ -770,43 +768,12 @@ export async function downloadAttendanceReport(
     const employeeName = data.employee.name.replace(/\s+/g, '_');
     const fileName = `Attendance_Report_${employeeName}_${monthName}.pdf`;
 
-    // Save to device
-    if (Platform.OS === 'android') {
-      try {
-        // Try to save to Downloads using MediaLibrary
-        // Note: This only works in development builds, not in Expo Go
-        const { status } = await MediaLibrary.requestPermissionsAsync(false);
-
-        if (status === 'granted') {
-          const asset = await MediaLibrary.createAssetAsync(uri);
-          await MediaLibrary.createAlbumAsync('Download', asset, false);
-
-          Alert.alert(
-            'Success',
-            `Attendance report has been downloaded to your device.\n\nFile: ${fileName}`,
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-      } catch (error) {
-        // MediaLibrary not available (Expo Go) or permission error
-        console.log('MediaLibrary not available, using share instead:', error);
-      }
-
-      // Fall back to share dialog
-      await Sharing.shareAsync(uri, {
-        UTI: '.pdf',
-        mimeType: 'application/pdf',
-        dialogTitle: `Attendance Report - ${data.employee.name} - ${data.period.monthName}`,
-      });
-    } else if (Platform.OS === 'ios') {
-      // For iOS, use share sheet
-      await Sharing.shareAsync(uri, {
-        UTI: '.pdf',
-        mimeType: 'application/pdf',
-        dialogTitle: `Attendance Report - ${data.employee.name} - ${data.period.monthName}`,
-      });
-    }
+    // Save to device via share sheet
+    await Sharing.shareAsync(uri, {
+      UTI: '.pdf',
+      mimeType: 'application/pdf',
+      dialogTitle: `Attendance Report - ${data.employee.name} - ${data.period.monthName}`,
+    });
   } catch (error) {
     console.error('Error generating attendance report:', error);
     throw error;

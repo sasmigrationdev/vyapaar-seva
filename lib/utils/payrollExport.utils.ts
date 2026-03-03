@@ -1,8 +1,7 @@
 import { supabase } from "@/lib/supabase/client";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
-import * as MediaLibrary from "expo-media-library";
-import { Platform, Alert } from "react-native";
+import { Platform } from "react-native";
 import {
   PayrollPeriod,
   PayrollSalaryRecord,
@@ -749,12 +748,7 @@ export async function generateBulkSalarySlips(
     const { period, salaries } = await fetchPayrollPeriodData(periodId);
 
     if (salaries.length === 0) {
-      Alert.alert(
-        "No Data",
-        "No salary records found for this payroll period.",
-        [{ text: "OK" }]
-      );
-      return;
+      throw new Error("No salary records found for this payroll period.");
     }
 
     // Generate HTML
@@ -769,38 +763,12 @@ export async function generateBulkSalarySlips(
     // Create filename
     const fileName = `Salary_Slips_${formatPayrollPeriod(period.month, period.year).replace(" ", "_")}.pdf`;
 
-    // Save/Share PDF
-    if (Platform.OS === "android") {
-      try {
-        const { status } = await MediaLibrary.requestPermissionsAsync(false);
-
-        if (status === "granted") {
-          const asset = await MediaLibrary.createAssetAsync(uri);
-          await MediaLibrary.createAlbumAsync("Download", asset, false);
-
-          Alert.alert(
-            "Success",
-            `Bulk salary slips have been downloaded.\n\nFile: ${fileName}`,
-            [{ text: "OK" }]
-          );
-          return;
-        }
-      } catch (error) {
-        console.log("MediaLibrary not available, using share:", error);
-      }
-
-      await Sharing.shareAsync(uri, {
-        UTI: ".pdf",
-        mimeType: "application/pdf",
-        dialogTitle: `Salary Slips - ${formatPayrollPeriod(period.month, period.year)}`,
-      });
-    } else if (Platform.OS === "ios") {
-      await Sharing.shareAsync(uri, {
-        UTI: ".pdf",
-        mimeType: "application/pdf",
-        dialogTitle: `Salary Slips - ${formatPayrollPeriod(period.month, period.year)}`,
-      });
-    }
+    // Save/Share PDF via share sheet
+    await Sharing.shareAsync(uri, {
+      UTI: ".pdf",
+      mimeType: "application/pdf",
+      dialogTitle: `Salary Slips - ${formatPayrollPeriod(period.month, period.year)}`,
+    });
   } catch (error) {
     console.error("Error generating bulk salary slips:", error);
     throw error;
@@ -818,12 +786,7 @@ export async function generatePayrollSummaryPDF(
     const { period, salaries } = await fetchPayrollPeriodData(periodId);
 
     if (salaries.length === 0) {
-      Alert.alert(
-        "No Data",
-        "No salary records found for this payroll period.",
-        [{ text: "OK" }]
-      );
-      return;
+      throw new Error("No salary records found for this payroll period.");
     }
 
     // Generate HTML
@@ -838,38 +801,12 @@ export async function generatePayrollSummaryPDF(
     // Create filename
     const fileName = `Payroll_Summary_${formatPayrollPeriod(period.month, period.year).replace(" ", "_")}.pdf`;
 
-    // Save/Share PDF
-    if (Platform.OS === "android") {
-      try {
-        const { status } = await MediaLibrary.requestPermissionsAsync(false);
-
-        if (status === "granted") {
-          const asset = await MediaLibrary.createAssetAsync(uri);
-          await MediaLibrary.createAlbumAsync("Download", asset, false);
-
-          Alert.alert(
-            "Success",
-            `Payroll summary has been downloaded.\n\nFile: ${fileName}`,
-            [{ text: "OK" }]
-          );
-          return;
-        }
-      } catch (error) {
-        console.log("MediaLibrary not available, using share:", error);
-      }
-
-      await Sharing.shareAsync(uri, {
-        UTI: ".pdf",
-        mimeType: "application/pdf",
-        dialogTitle: `Payroll Summary - ${formatPayrollPeriod(period.month, period.year)}`,
-      });
-    } else if (Platform.OS === "ios") {
-      await Sharing.shareAsync(uri, {
-        UTI: ".pdf",
-        mimeType: "application/pdf",
-        dialogTitle: `Payroll Summary - ${formatPayrollPeriod(period.month, period.year)}`,
-      });
-    }
+    // Save/Share PDF via share sheet
+    await Sharing.shareAsync(uri, {
+      UTI: ".pdf",
+      mimeType: "application/pdf",
+      dialogTitle: `Payroll Summary - ${formatPayrollPeriod(period.month, period.year)}`,
+    });
   } catch (error) {
     console.error("Error generating payroll summary:", error);
     throw error;

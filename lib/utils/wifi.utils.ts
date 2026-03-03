@@ -1,7 +1,7 @@
 import { WiFiVerificationStatus } from "@/lib/types";
 import NetInfo from "@react-native-community/netinfo";
 import * as Location from "expo-location";
-import { Platform } from "react-native";
+import { PermissionsAndroid, Platform } from "react-native";
 
 /**
  * Request location permissions required for WiFi SSID access
@@ -11,23 +11,39 @@ export const requestLocationPermissions = async (): Promise<boolean> => {
   try {
     // Check if we already have permission
     const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
-    
+
     if (existingStatus === "granted") {
       console.log("Location permission already granted");
-      return true;
+    } else {
+      // Request permission if not already granted
+      console.log("Requesting location permission for WiFi SSID access...");
+      const { status } = await Location.requestForegroundPermissionsAsync();
+
+      if (status !== "granted") {
+        console.log("Location permission denied:", status);
+        return false;
+      }
+      console.log("Location permission granted");
     }
 
-    // Request permission if not already granted
-    console.log("Requesting location permission for WiFi SSID access...");
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    
-    if (status === "granted") {
-      console.log("Location permission granted");
-      return true;
-    } else {
-      console.log("Location permission denied:", status);
-      return false;
+    // Android 12+ (API 31+) requires NEARBY_WIFI_DEVICES to read SSID
+    if (Platform.OS === "android" && Platform.Version >= 31) {
+      const wifiPermission = await PermissionsAndroid.request(
+        "android.permission.NEARBY_WIFI_DEVICES" as any,
+        {
+          title: "WiFi Access Required",
+          message: "This app needs WiFi access to verify your office network for attendance.",
+          buttonPositive: "Allow",
+        }
+      );
+      console.log("NEARBY_WIFI_DEVICES permission result:", wifiPermission);
+      if (wifiPermission !== PermissionsAndroid.RESULTS.GRANTED) {
+        console.log("NEARBY_WIFI_DEVICES permission denied");
+        return false;
+      }
     }
+
+    return true;
   } catch (error) {
     console.error("Error requesting location permissions:", error);
     return false;

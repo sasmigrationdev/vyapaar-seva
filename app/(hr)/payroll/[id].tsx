@@ -350,7 +350,7 @@ export default function PayrollPeriodDetailScreen() {
       await generateBulkSalarySlips(id);
     } catch (err) {
       console.error("Error exporting PDF:", err);
-      error("Error", "Failed to generate salary slips PDF");
+      error("Error", err instanceof Error ? err.message : "Failed to generate salary slips PDF");
     } finally {
       setExportingPDF(false);
     }
@@ -362,7 +362,7 @@ export default function PayrollPeriodDetailScreen() {
       await generatePayrollSummaryPDF(id);
     } catch (err) {
       console.error("Error exporting summary:", err);
-      error("Error", "Failed to generate payroll summary PDF");
+      error("Error", err instanceof Error ? err.message : "Failed to generate payroll summary PDF");
     } finally {
       setExportingSummary(false);
     }

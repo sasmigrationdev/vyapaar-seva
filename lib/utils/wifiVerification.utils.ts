@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentWiFiSSID, requestLocationPermissions } from "./wifi.utils";
 import NetInfo from "@react-native-community/netinfo";
+import { PermissionsAndroid, Platform } from "react-native";
 
 export interface WiFiVerificationResult {
   currentSsid: string | null;
@@ -57,6 +58,23 @@ export async function performWiFiVerification(
 
     // 3. Get current WiFi SSID
     const currentSsid = await getCurrentWiFiSSID();
+
+    // Diagnostic logging for Play Store debugging
+    if (!currentSsid) {
+      const state = await NetInfo.fetch();
+      console.log("[WiFi Diag] Platform:", Platform.OS, "API Level:", Platform.Version);
+      console.log("[WiFi Diag] NetInfo full state:", JSON.stringify(state, null, 2));
+      if (Platform.OS === "android" && Platform.Version >= 31) {
+        const nearbyWifi = await PermissionsAndroid.check(
+          "android.permission.NEARBY_WIFI_DEVICES" as any
+        );
+        const fineLocation = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+        );
+        console.log("[WiFi Diag] NEARBY_WIFI_DEVICES granted:", nearbyWifi);
+        console.log("[WiFi Diag] ACCESS_FINE_LOCATION granted:", fineLocation);
+      }
+    }
 
     // Check if we're connected to WiFi but can't get SSID (likely location services disabled)
     if (!currentSsid && isRequired) {

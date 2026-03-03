@@ -254,7 +254,7 @@ export default function HRSalaryScreen() {
       success("Success", "Salary sheet generated successfully!");
     } catch (err) {
       console.error("Error downloading salary sheet:", err);
-      error("Error", "Failed to generate salary sheet. Please try again.");
+      error("Error", err instanceof Error ? err.message : "Failed to generate salary sheet. Please try again.");
     } finally {
       setDownloading(false);
     }

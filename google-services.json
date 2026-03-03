@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:374979006048:android:695d6b910b21b6e141fd05",
+        "mobilesdk_app_id": "1:374979006048:android:1012dee4096781eb41fd05",
         "android_client_info": {
-          "package_name": "com.vyapaarseva.app"
+          "package_name": "com.sasmigration.vyapaarseva"
         }
       },
       "oauth_client": [],
