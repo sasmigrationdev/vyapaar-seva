@@ -13,36 +13,43 @@
       "env": {
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "920584935188-5p4v3hl6mif6osrobtn04891180scklj.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "920584935188-pkp4jstfnnk3efsljb5drjfrvql5g0d8.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "920584935188-nv9e5mhbqkbegfnkdmlp3igf122nuu7i.apps.googleusercontent.com",
         "EXPO_PUBLIC_SUPABASE_URL": "https://yardyctualuppxckvobx.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhcmR5Y3R1YWx1cHB4Y2t2b2J4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1Nzg4NDQsImV4cCI6MjA3NTE1NDg0NH0.y8u2TsebEVbu0UCNkXuw4b-1j8zGhEqtjDV8OeIcfEk"
       }
     },
     "preview": {
       "distribution": "internal",
-      "credentialsSource": "local",
+      "credentialsSource": "remote",
       "android": {
         "buildType": "apk"
       },
       "env": {
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "920584935188-5p4v3hl6mif6osrobtn04891180scklj.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "920584935188-pkp4jstfnnk3efsljb5drjfrvql5g0d8.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "920584935188-nv9e5mhbqkbegfnkdmlp3igf122nuu7i.apps.googleusercontent.com",
         "EXPO_PUBLIC_SUPABASE_URL": "https://yardyctualuppxckvobx.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhcmR5Y3R1YWx1cHB4Y2t2b2J4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1Nzg4NDQsImV4cCI6MjA3NTE1NDg0NH0.y8u2TsebEVbu0UCNkXuw4b-1j8zGhEqtjDV8OeIcfEk"
       }
     },
     "production": {
-      "autoIncrement": true,
       "distribution": "store",
-      "credentialsSource": "local",
+      "credentialsSource": "remote",
       "android": {
         "buildType": "apk"
       },
       "env": {
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "920584935188-5p4v3hl6mif6osrobtn04891180scklj.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "920584935188-pkp4jstfnnk3efsljb5drjfrvql5g0d8.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "920584935188-nv9e5mhbqkbegfnkdmlp3igf122nuu7i.apps.googleusercontent.com",
         "EXPO_PUBLIC_SUPABASE_URL": "https://yardyctualuppxckvobx.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhcmR5Y3R1YWx1cHB4Y2t2b2J4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1Nzg4NDQsImV4cCI6MjA3NTE1NDg0NH0.y8u2TsebEVbu0UCNkXuw4b-1j8zGhEqtjDV8OeIcfEk"
       }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {}
     }
   }
 }
