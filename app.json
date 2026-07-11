@@ -12,7 +12,19 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.vyapaarseva.app",
       "infoPlist": {
-        "NSFaceIDUsageDescription": "Vyapaar Sewa uses Face ID to secure your app and protect your data."
+        "NSFaceIDUsageDescription": "Vyapaar Sewa uses Face ID to secure your app and protect your data.",
+        "NSLocationWhenInUseUsageDescription": "Vyapaar Sewa uses your location to verify you are connected to your office WiFi network when marking attendance.",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.920584935188-nv9e5mhbqkbegfnkdmlp3igf122nuu7i"
+            ]
+          }
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "com.apple.developer.networking.wifi-info": true
       }
     },
     "android": {
@@ -47,6 +59,24 @@
     "plugins": [
       "expo-router",
       [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static",
+            "extraPods": [
+              {
+                "name": "GoogleUtilities",
+                "modular_headers": true
+              },
+              {
+                "name": "RecaptchaInterop",
+                "modular_headers": true
+              }
+            ]
+          }
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
@@ -75,18 +105,21 @@
       ],
       "expo-asset",
       "@react-native-google-signin/google-signin",
-      "expo-local-authentication"
+      "expo-local-authentication",
+      "@react-native-community/datetimepicker",
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": false
     },
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "45c749af-e9ff-4d61-99d8-c81434a33854"
+        "projectId": "f8ea8bcd-9a45-4472-a236-a31c67e1804b"
       }
     },
-    "owner": "sasmigrations-organization"
+    "owner": "sasmigration42"
   }
 }

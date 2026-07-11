@@ -3,6 +3,14 @@ import NetInfo from "@react-native-community/netinfo";
 import * as Location from "expo-location";
 import { PermissionsAndroid, Platform } from "react-native";
 
+// On iOS, NetInfo will NOT attempt to read the WiFi SSID unless `shouldFetchWiFiSSID`
+// is enabled. Without this, `state.details.ssid` is always null on iPhone, so office
+// WiFi verification can never match and attendance check-in/out gets blocked.
+// This requires the native requirements to be met as well (location permission +
+// NSLocationWhenInUseUsageDescription, and the "Access WiFi Information" entitlement),
+// otherwise enabling it leaks memory — both are configured in app.json's ios section.
+NetInfo.configure({ shouldFetchWiFiSSID: true });
+
 /**
  * Request location permissions required for WiFi SSID access
  * Note: Android 10+ requires location permission to access WiFi SSID
@@ -159,35 +167,56 @@ export const formatSSID = (ssid: string | null): string => {
  */
 export const getAvailableWiFiNetworks = async (): Promise<string[]> => {
   try {
-    // Request location permissions first
+    // Request location permissions first (required for the OS to expose the SSID)
     const permissionGranted = await requestLocationPermissions();
-    
+
     if (!permissionGranted) {
       console.warn("Location permission required to scan WiFi networks");
-      throw new Error("Location permission is required to scan WiFi networks. Please grant permission in your device settings.");
+      throw new Error(
+        "Location permission is required to detect your WiFi network. Please grant location access in your device settings, then try again."
+      );
     }
 
-    // Wait a moment for the system to process the permission grant
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Give the OS a moment to process a freshly-granted permission.
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Fetch fresh network state after permissions are granted
-    const state = await NetInfo.fetch();
-    
-    console.log("Network state after permission grant:", {
+    // Force a fresh read of the WiFi interface. Passing "wifi" (rather than a
+    // bare fetch that may return a cached state) makes NetInfo query the WiFi
+    // interface and, together with `shouldFetchWiFiSSID` (configured at the top
+    // of this module), triggers the native SSID lookup on iOS.
+    let state = await NetInfo.fetch("wifi");
+
+    // The SSID often comes back null on the first read right after the
+    // permission prompt; retry once after a short delay before giving up.
+    if (state.isConnected && !(state.details as any)?.ssid) {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      state = await NetInfo.fetch("wifi");
+    }
+
+    console.log("WiFi scan state:", {
       type: state.type,
       isConnected: state.isConnected,
-      ssid: state.details?.ssid
+      ssid: (state.details as any)?.ssid,
     });
-    
-    if (state.type !== "wifi") {
-      throw new Error("Not connected to WiFi. Please connect to a WiFi network and try again.");
+
+    if (!state.isConnected) {
+      throw new Error(
+        "Not connected to WiFi. Please connect to your office WiFi network and try again."
+      );
     }
-    
-    if (!state.details?.ssid) {
-      throw new Error("Could not detect WiFi network name. Make sure you're connected to WiFi.");
+
+    const rawSsid = (state.details as any)?.ssid as string | null | undefined;
+    if (!rawSsid) {
+      // Connected to WiFi, but the OS won't expose the network name. On iOS this
+      // is a platform restriction, not a bug in the app.
+      const hint =
+        Platform.OS === "ios"
+          ? "On iPhone, reading the WiFi name requires Location Services to be ON and this app's location permission set to “While Using the App”. If it still can't be read, just type the network name manually below."
+          : "Please make sure Location Services are enabled, then try again — or type the network name manually below.";
+      throw new Error(`Could not read your WiFi network name. ${hint}`);
     }
-    
-    const ssid = state.details.ssid.replace(/^"(.*)"$/, "$1");
+
+    const ssid = rawSsid.replace(/^"(.*)"$/, "$1");
     console.log("Successfully detected WiFi network:", ssid);
     return [ssid];
   } catch (error) {

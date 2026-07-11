@@ -17,6 +17,7 @@ import * as SplashScreen from 'expo-splash-screen';
 
 // Note: useColorScheme removed - forcing light theme for consistency
 import { QueryProvider } from '@/lib/providers/QueryProvider';
+import { AuthProvider } from '@/lib/providers/AuthProvider';
 import { useAuth } from '@/hooks/auth/useAuth';
 import { AlertProvider } from '@/hooks/useAlert';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -179,7 +180,9 @@ export default function RootLayout() {
       <AlertProvider>
         {/* Force light theme for consistency across iOS and Android */}
         <ThemeProvider value={DefaultTheme}>
-          <RootLayoutNav />
+          <AuthProvider>
+            <RootLayoutNav />
+          </AuthProvider>
           <StatusBar style="dark" />
         </ThemeProvider>
       </AlertProvider>

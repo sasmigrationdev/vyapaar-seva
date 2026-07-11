@@ -2,8 +2,6 @@ import AddOvertimeModal from "@/components/attendance/AddOvertimeModal";
 import BreakRequestModal from "@/components/attendance/BreakRequestModal";
 import WiFiVerificationModal from "@/components/attendance/WiFiVerificationModal";
 import AttendanceStreakBadge from "@/components/ui/AttendanceStreakBadge";
-import CircularHoursProgress from "@/components/ui/CircularHoursProgress";
-import { DepthButton } from "@/components/ui/DepthButton";
 import MiniCalendarHeatmap from "@/components/ui/MiniCalendarHeatmap";
 import { NeumorphicCheckInButton } from "@/components/ui/NeumorphicCheckInButton";
 import { Text } from "@/components/ui/Text";
@@ -13,8 +11,7 @@ import {
   PressOpacity,
   Shadows,
   Spacing,
-  StatusColors,
-  Typography,
+  StatusColors
 } from "@/constants/theme";
 import { useAuth } from "@/hooks/auth/useAuth";
 import {
@@ -29,12 +26,13 @@ import {
 import { useUserAttendanceSummary } from "@/hooks/queries/useAttendanceSummary";
 import { useMyBreakRequests } from "@/hooks/queries/useBreakRequests";
 import { useCurrentMonthEarnings } from "@/hooks/queries/useEarnings";
-import { useOvertimeRequestByAttendance } from "@/hooks/queries/useOvertimeRequests";
 import { useEmployeeJoinRequests } from "@/hooks/queries/useEmployerRequests";
 import { useCurrentEmployment } from "@/hooks/queries/useEmploymentHistory";
+import { useOvertimeRequestByAttendance } from "@/hooks/queries/useOvertimeRequests";
 import { useLatestSalary } from "@/hooks/queries/useSalary";
-import { useAutoRejectExpiredBreaks } from "@/hooks/useAutoRejectExpiredBreaks";
+import { useAlert } from "@/hooks/useAlert";
 import { useAutoAttendance } from "@/hooks/useAutoAttendance";
+import { useAutoRejectExpiredBreaks } from "@/hooks/useAutoRejectExpiredBreaks";
 import { WeekDay } from "@/lib/types";
 import {
   calculateAttendanceStreak,
@@ -51,10 +49,10 @@ import {
   formatWorkingDays,
   isTodayWorkingDay,
 } from "@/lib/utils/workingDays.utils";
-import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Href, useRouter } from "expo-router";
-import { useMemo, useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -63,20 +61,18 @@ import {
   StatusBar,
   StyleSheet,
   TouchableOpacity,
-  View,
-  Image,
+  View
 } from "react-native";
 import Animated, {
+  Easing,
   FadeInDown,
   FadeInUp,
-  useSharedValue,
   useAnimatedStyle,
+  useSharedValue,
   withRepeat,
-  withTiming,
   withSequence,
-  Easing,
+  withTiming,
 } from "react-native-reanimated";
-import { useAlert } from "@/hooks/useAlert";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -193,7 +189,7 @@ export default function EmployeeDashboard() {
   const [wifiVerificationResult, setWifiVerificationResult] =
     useState<WiFiVerificationResult | null>(null);
   const [pendingAction, setPendingAction] = useState<
-    "check-in" | "check-out" | null
+    "check-in" | "check-out" | "end-break" | null
   >(null);
 
   const router = useRouter();
@@ -351,22 +347,6 @@ export default function EmployeeDashboard() {
     setWifiVerificationResult(wifiResult);
     setPendingAction("check-in");
     setShowWiFiModal(true);
-
-    if (!wifiResult.isRequired || wifiResult.isVerified) {
-      setTimeout(() => {
-        checkInMutation.mutate({
-          notes: "Self check-in",
-          wifiInfo: wifiResult.isVerified
-            ? { ssid: wifiResult.currentSsid, verified: true }
-            : undefined,
-        });
-      }, 2000);
-    } else {
-      error(
-        "WiFi Verification Required",
-        "Your organization requires WiFi verification. Please connect to the office WiFi network and try again."
-      );
-    }
   };
 
   const handleEndBreak = async () => {
@@ -386,25 +366,8 @@ export default function EmployeeDashboard() {
     );
 
     setWifiVerificationResult(wifiResult);
-    setPendingAction("check-in");
+    setPendingAction("end-break");
     setShowWiFiModal(true);
-
-    if (!wifiResult.isRequired || wifiResult.isVerified) {
-      setTimeout(() => {
-        endBreakMutation.mutate({
-          breakRequestId: activeBreak.id,
-          wifiSsid: wifiResult.isVerified
-            ? wifiResult.currentSsid || ""
-            : undefined,
-          wifiVerified: wifiResult.isVerified,
-        });
-      }, 2000);
-    } else {
-      error(
-        "WiFi Verification Required",
-        "Your organization requires WiFi verification. Please connect to the office WiFi network and try again."
-      );
-    }
   };
 
   const handleCheckOut = async () => {
@@ -434,22 +397,44 @@ export default function EmployeeDashboard() {
     setWifiVerificationResult(wifiResult);
     setPendingAction("check-out");
     setShowWiFiModal(true);
+  };
 
-    if (!wifiResult.isRequired || wifiResult.isVerified) {
-      setTimeout(() => {
-        checkOutMutation.mutate({
-          recordId: todayAttendance.id,
-          notes: "Self check-out",
-          wifiInfo: wifiResult.isVerified
-            ? { ssid: wifiResult.currentSsid, verified: true }
-            : undefined,
-        });
-      }, 2000);
-    } else {
-      error(
-        "WiFi Verification Required",
-        "Your organization requires WiFi verification. Please connect to the office WiFi network and try again."
-      );
+  // Runs the pending attendance action only after the user confirms in the
+  // WiFi verification modal. Gated so nothing happens unless verification
+  // passes (or isn't required) AND the user explicitly presses Continue.
+  const handleConfirmWiFiAction = () => {
+    const wifiResult = wifiVerificationResult;
+    const action = pendingAction;
+
+    setShowWiFiModal(false);
+
+    if (!wifiResult || !action) return;
+
+    // Verification required but failed — do not perform the action.
+    if (wifiResult.isRequired && !wifiResult.isVerified) {
+      return;
+    }
+
+    const wifiInfo = wifiResult.isVerified
+      ? { ssid: wifiResult.currentSsid, verified: true }
+      : undefined;
+
+    if (action === "check-in") {
+      checkInMutation.mutate({ notes: "Self check-in", wifiInfo });
+    } else if (action === "check-out") {
+      if (!todayAttendance?.id) return;
+      checkOutMutation.mutate({
+        recordId: todayAttendance.id,
+        notes: "Self check-out",
+        wifiInfo,
+      });
+    } else if (action === "end-break") {
+      if (!activeBreak) return;
+      endBreakMutation.mutate({
+        breakRequestId: activeBreak.id,
+        wifiSsid: wifiResult.isVerified ? wifiResult.currentSsid || "" : undefined,
+        wifiVerified: wifiResult.isVerified,
+      });
     }
   };
 
@@ -490,7 +475,7 @@ export default function EmployeeDashboard() {
     if (!currentEmployment?.joined_at) return undefined;
     const months = Math.floor(
       (new Date().getTime() - new Date(currentEmployment.joined_at).getTime()) /
-        (1000 * 60 * 60 * 24 * 30)
+      (1000 * 60 * 60 * 24 * 30)
     );
     if (months < 1) return "New";
     const years = Math.floor(months / 12);
@@ -505,7 +490,7 @@ export default function EmployeeDashboard() {
     if (!currentEmployment?.joined_at) return true;
     const joinedDays = Math.floor(
       (new Date().getTime() - new Date(currentEmployment.joined_at).getTime()) /
-        (1000 * 60 * 60 * 24)
+      (1000 * 60 * 60 * 24)
     );
     return joinedDays < 7 || (monthlyStats?.daysAttended || 0) < 3;
   }, [currentEmployment?.joined_at, monthlyStats?.daysAttended]);
@@ -719,7 +704,7 @@ export default function EmployeeDashboard() {
                         <Text style={styles.completedStatValue}>
                           {formatHours(
                             (todayAttendance?.total_hours || 0) -
-                              (todayAttendance?.overtime_hours || 0)
+                            (todayAttendance?.overtime_hours || 0)
                           )}
                         </Text>
                         <Text style={styles.completedStatLabel}>Hours</Text>
@@ -1229,8 +1214,8 @@ export default function EmployeeDashboard() {
                     {loadingSalary
                       ? "..."
                       : latestSalary
-                      ? formatCurrency(latestSalary.total_salary || 0)
-                      : "View Salary"}
+                        ? formatCurrency(latestSalary.total_salary || 0)
+                        : "View Salary"}
                   </Text>
                 </View>
               </View>
@@ -1241,8 +1226,8 @@ export default function EmployeeDashboard() {
                     latestSalary.status === "paid"
                       ? styles.statusPaid
                       : latestSalary.status === "approved"
-                      ? styles.statusApproved
-                      : styles.statusPending,
+                        ? styles.statusApproved
+                        : styles.statusPending,
                   ]}
                 >
                   <Text style={styles.earningsStatusText}>
@@ -1412,8 +1397,9 @@ export default function EmployeeDashboard() {
         <WiFiVerificationModal
           visible={showWiFiModal}
           onClose={() => setShowWiFiModal(false)}
+          onConfirm={handleConfirmWiFiAction}
           verificationResult={wifiVerificationResult}
-          action={pendingAction || "check-in"}
+          action={pendingAction === "check-out" ? "check-out" : "check-in"}
         />
       )}
     </View>

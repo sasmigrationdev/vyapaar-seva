@@ -15,6 +15,13 @@ export type { WiFiVerificationResult };
 interface WiFiVerificationModalProps {
   visible: boolean;
   onClose: () => void;
+  /**
+   * Called when the user confirms the action via the primary button.
+   * The actual attendance action is performed here, so nothing happens
+   * unless the user explicitly presses the button. Falls back to onClose
+   * if not provided.
+   */
+  onConfirm?: () => void;
   verificationResult: WiFiVerificationResult;
   action: "check-in" | "check-out";
 }
@@ -22,6 +29,7 @@ interface WiFiVerificationModalProps {
 export default function WiFiVerificationModal({
   visible,
   onClose,
+  onConfirm,
   verificationResult,
   action,
 }: WiFiVerificationModalProps) {
@@ -220,9 +228,9 @@ export default function WiFiVerificationModal({
                 </View>
                 <Text style={styles.resultMessage}>
                   {isVerified
-                    ? `Connected to authorized office network. Your ${
+                    ? `Connected to authorized office network. Press "Continue" to record your ${
                         action === "check-in" ? "check-in" : "check-out"
-                      } has been recorded successfully.`
+                      }.`
                     : isRequired
                     ? `You must connect to one of the allowed office WiFi networks to ${
                         action === "check-in" ? "check in" : "check out"
@@ -288,7 +296,7 @@ export default function WiFiVerificationModal({
                 styles.actionButton,
                 isVerified ? styles.actionButtonSuccess : styles.actionButtonPrimary
               ]}
-              onPress={onClose}
+              onPress={onConfirm ?? onClose}
               activeOpacity={0.8}
             >
               <Text style={styles.actionButtonText}>
