@@ -1,7 +1,7 @@
 {
   "cli": {
     "version": ">= 16.4.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -33,7 +33,6 @@
       }
     },
     "production": {
-      "autoIncrement": true,
       "distribution": "store",
       "credentialsSource": "remote",
       "android": {
@@ -46,6 +45,11 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://yardyctualuppxckvobx.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhcmR5Y3R1YWx1cHB4Y2t2b2J4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk1Nzg4NDQsImV4cCI6MjA3NTE1NDg0NH0.y8u2TsebEVbu0UCNkXuw4b-1j8zGhEqtjDV8OeIcfEk"
       }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {}
     }
   }
 }

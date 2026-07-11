@@ -11,6 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.vyapaarseva.app",
+      "buildNumber": "11",
       "infoPlist": {
         "NSFaceIDUsageDescription": "Vyapaar Sewa uses Face ID to secure your app and protect your data.",
         "NSLocationWhenInUseUsageDescription": "Vyapaar Sewa uses your location to verify you are connected to your office WiFi network when marking attendance.",
@@ -37,6 +38,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.sasmigration.vyapaarseva",
+      "versionCode": 10,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.READ_MEDIA_AUDIO",
@@ -117,9 +119,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "f8ea8bcd-9a45-4472-a236-a31c67e1804b"
+        "projectId": "bc21ae6e-ee3f-4fa9-b520-73920da2e993"
       }
     },
-    "owner": "sasmigration42"
+    "owner": "viperinstitute1"
   }
 }
