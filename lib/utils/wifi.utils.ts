@@ -59,12 +59,44 @@ export const requestLocationPermissions = async (): Promise<boolean> => {
 };
 
 /**
+ * On iOS, `CNCopyCurrentNetworkInfo` (which NetInfo uses to read the SSID) often
+ * returns null until the app has actually exercised its location authorization at
+ * least once this session. A single low-accuracy location fix "primes" it. This is
+ * required in EVERY path that reads the SSID (scan AND check-in verification), not
+ * just the scan screen. Failures here are harmless (e.g. Location Services off) — we
+ * still attempt the SSID read afterwards.
+ */
+const primeiOSLocationForSSID = async (): Promise<void> => {
+  if (Platform.OS !== "ios") return;
+  try {
+    await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Lowest,
+    });
+  } catch (locErr) {
+    console.log("Location prime for SSID read failed (continuing):", locErr);
+  }
+};
+
+/**
  * Get current WiFi SSID
  * Returns null if not connected to WiFi or permissions not granted
  */
 export const getCurrentWiFiSSID = async (): Promise<string | null> => {
   try {
-    const state = await NetInfo.fetch();
+    // iOS needs location authorization exercised before the SSID becomes readable.
+    await primeiOSLocationForSSID();
+
+    // Query the WiFi interface directly (not a possibly-cached bare fetch) so that,
+    // together with `shouldFetchWiFiSSID`, the native SSID lookup is triggered on iOS.
+    let state = await NetInfo.fetch("wifi");
+
+    // The SSID frequently comes back null on the first read right after priming;
+    // retry a few times with a short delay before giving up.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (state.type === "wifi" && (state.details as any)?.ssid) break;
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      state = await NetInfo.fetch("wifi");
+    }
 
     console.log("NetInfo state:", {
       type: state.type,
@@ -79,12 +111,12 @@ export const getCurrentWiFiSSID = async (): Promise<string | null> => {
 
     // SSID is only available if location permissions are granted
     let ssid = state.details?.ssid || null;
-    
+
     // Clean up SSID (remove quotes if present - Android sometimes adds them)
     if (ssid) {
       ssid = ssid.replace(/^"(.*)"$/, "$1");
     }
-    
+
     console.log("WiFi SSID retrieved:", ssid);
     return ssid;
   } catch (error) {
@@ -129,10 +161,11 @@ export const getWiFiVerificationStatus = async (
       };
     }
 
-    // Get network state
-    const state = await NetInfo.fetch();
-    const isConnected = state.isConnected && state.type === "wifi";
-    const ssid = state.details?.ssid || null;
+    // Get network state. Use getCurrentWiFiSSID so iOS location priming + SSID
+    // retries are applied here too (a bare NetInfo.fetch() returns null on iPhone).
+    const ssid = await getCurrentWiFiSSID();
+    const state = await NetInfo.fetch("wifi");
+    const isConnected = !!state.isConnected && state.type === "wifi";
     const isOfficeWiFi = ssid ? allowedSSIDs.includes(ssid) : false;
 
     return {
@@ -180,20 +213,9 @@ export const getAvailableWiFiNetworks = async (): Promise<string[]> => {
     // Give the OS a moment to process a freshly-granted permission.
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // On iOS, `CNCopyCurrentNetworkInfo` (which NetInfo uses under the hood to
-    // read the SSID) frequently returns null until the app has actually
-    // exercised its location authorization at least once in this session. A
-    // single low-accuracy location fix "primes" it. Failures here are harmless
-    // (e.g. Location Services off) — we still try to read the SSID afterwards.
-    if (Platform.OS === "ios") {
-      try {
-        await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Lowest,
-        });
-      } catch (locErr) {
-        console.log("Location prime for SSID read failed (continuing):", locErr);
-      }
-    }
+    // On iOS the SSID stays null until location authorization has been exercised
+    // at least once this session; prime it (shared helper, no-op on Android).
+    await primeiOSLocationForSSID();
 
     // Force a fresh read of the WiFi interface. Passing "wifi" (rather than a
     // bare fetch that may return a cached state) makes NetInfo query the WiFi
