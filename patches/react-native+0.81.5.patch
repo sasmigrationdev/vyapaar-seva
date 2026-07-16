@@ -1,0 +1,45 @@
+diff --git a/node_modules/react-native/React/Views/RCTBorderDrawing.m b/node_modules/react-native/React/Views/RCTBorderDrawing.m
+index da99e0c..1a45af2 100644
+--- a/node_modules/react-native/React/Views/RCTBorderDrawing.m
++++ b/node_modules/react-native/React/Views/RCTBorderDrawing.m
+@@ -8,6 +8,8 @@
+ #import "RCTBorderDrawing.h"
+ #import "RCTLog.h"
+ 
++#import <math.h>
++
+ static const CGFloat RCTViewBorderThreshold = 0.001;
+ 
+ CGFloat RCTMaxBorderInset(UIEdgeInsets borderInsets)
+@@ -250,6 +252,14 @@ static CGPathRef RCTPathCreateOuterOutline(BOOL drawToEdge, CGRect rect, RCTCorn
+     edgeInsets.top + 1 + edgeInsets.bottom
+   } : viewSize;
+ 
++  // Guard: a NaN/Infinity/negative border radius, border width, or view dimension
++  // produces an invalid image size. Rendering it and calling
++  // -resizableImageWithCapInsets: below throws `couldNotInstantiate`, which is an
++  // uncaught ObjC exception that aborts the app. Bail out (border just won't draw).
++  if (!isfinite(size.width) || !isfinite(size.height) || size.width <= 0 || size.height <= 0) {
++    return nil;
++  }
++
+   UIGraphicsImageRenderer *const imageRenderer =
+       RCTMakeUIGraphicsImageRenderer(size, backgroundColor, hasCornerRadii, drawToEdge);
+ 
+@@ -414,7 +424,15 @@ static CGPathRef RCTPathCreateOuterOutline(BOOL drawToEdge, CGRect rect, RCTCorn
+   }];
+ 
+   if (makeStretchable) {
+-    image = [image resizableImageWithCapInsets:edgeInsets];
++    // Guard: cap insets must be finite, non-negative, and strictly smaller than the
++    // image, otherwise -resizableImageWithCapInsets: throws `couldNotInstantiate`.
++    const BOOL capInsetsValid = image != nil && isfinite(edgeInsets.left) && isfinite(edgeInsets.right) &&
++        isfinite(edgeInsets.top) && isfinite(edgeInsets.bottom) && edgeInsets.left >= 0 &&
++        edgeInsets.right >= 0 && edgeInsets.top >= 0 && edgeInsets.bottom >= 0 &&
++        (edgeInsets.left + edgeInsets.right) < size.width && (edgeInsets.top + edgeInsets.bottom) < size.height;
++    if (capInsetsValid) {
++      image = [image resizableImageWithCapInsets:edgeInsets];
++    }
+   }
+ 
+   return image;

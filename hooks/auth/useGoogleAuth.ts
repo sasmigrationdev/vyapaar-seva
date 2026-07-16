@@ -4,6 +4,9 @@ import { useSignInWithGoogle } from '@/hooks/mutations/useAuthMutations';
 
 // Get Google Client IDs from environment
 const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+// iOS needs its own client ID (or a GoogleService-Info.plist). Without it,
+// GoogleSignin.configure() throws "failed to determine clientID" on iPhone.
+const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 
 // Check if running in Expo Go (native modules not available)
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -58,6 +61,7 @@ export const useGoogleAuth = () => {
       try {
         GoogleSignin.configure({
           webClientId: WEB_CLIENT_ID,
+          ...(IOS_CLIENT_ID ? { iosClientId: IOS_CLIENT_ID } : {}),
           offlineAccess: true,
         });
         setIsReady(true);

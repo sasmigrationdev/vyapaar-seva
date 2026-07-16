@@ -24,6 +24,49 @@ export const formatTime = (date: Date | string): string => {
 };
 
 /**
+ * Format a timestamp as a 12-hour clock time with AM/PM (e.g. "10:00 AM").
+ * Prefer this for user-facing copy such as notifications.
+ */
+export const formatClockTime = (date: Date | string): string => {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return format(d, 'hh:mm a');
+};
+
+/**
+ * Extract the local HH:mm from a stored attendance timestamp, guarding against
+ * the "05:30 AM" corruption bug.
+ *
+ * A check_in_time stored at exactly UTC midnight (e.g. "2026-07-06T00:00:00+00:00")
+ * is an artifact: in IST it reads back as 05:30, and re-saving it recomputes the
+ * same UTC-midnight value — a self-perpetuating loop. A genuine HR-picked time
+ * (e.g. 09:00 -> 03:30Z) or self check-in never lands on exact UTC midnight, so we
+ * treat exact UTC midnight (and date-only / empty values) as "no time set" and
+ * return an empty string. Callers then force HR to pick a real time.
+ */
+export const timeFromStoredTimestamp = (
+  value: string | null | undefined
+): string => {
+  if (!value) return '';
+  // Date-only values ("2026-07-06") carry no time-of-day.
+  if (!String(value).includes('T')) return '';
+
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return '';
+
+  // Exact UTC midnight == the corruption artifact (05:30 IST). Treat as unset.
+  if (
+    d.getUTCHours() === 0 &&
+    d.getUTCMinutes() === 0 &&
+    d.getUTCSeconds() === 0 &&
+    d.getUTCMilliseconds() === 0
+  ) {
+    return '';
+  }
+
+  return format(d, 'HH:mm');
+};
+
+/**
  * Format datetime to readable format
  */
 export const formatDateTime = (date: Date | string): string => {
@@ -107,6 +150,27 @@ export const formatDate = (date: Date | string): string => {
 export const formatDateShort = (date: Date | string): string => {
   const d = typeof date === 'string' ? new Date(date) : date;
   return format(d, 'MMM d');
+};
+
+/**
+ * Format a timestamp as a short relative time (e.g. "Just now", "5m ago",
+ * "2h ago", "3d ago"). Falls back to an absolute date for older items.
+ */
+export const formatRelativeTime = (date: Date | string): string => {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const diffMs = Date.now() - d.getTime();
+  const diffMin = Math.floor(diffMs / (1000 * 60));
+
+  if (diffMin < 1) return 'Just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+
+  const diffDays = Math.floor(diffHr / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+
+  return formatDate(d);
 };
 
 /**

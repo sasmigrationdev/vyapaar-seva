@@ -1,6 +1,9 @@
 import { attendanceMutations } from "@/lib/api/mutations/attendance.mutations";
 import { notificationMutations } from "@/lib/api/mutations/notification.mutations";
+import { notificationKeys } from "@/hooks/queries/useNotification";
 import { AttendanceBreak, AttendanceRecord } from "@/lib/types";
+import { formatTime, formatClockTime } from "@/lib/utils/date.utils";
+import { presentLocalNotification } from "@/lib/utils/notify.utils";
 import {
   useMutation,
   UseMutationOptions,
@@ -36,6 +39,34 @@ export const useCheckIn = (
         queryClient.invalidateQueries({ queryKey: ["salary"] }),
         queryClient.invalidateQueries({ queryKey: ["earnings"] }),
       ]);
+
+      // Notify the employee of their own check-in
+      const checkInTime = data?.check_in_time
+        ? formatTime(data.check_in_time)
+        : formatTime(new Date());
+      const message = `You checked in at ${checkInTime}.`;
+
+      // In-app notification (bell/history)
+      try {
+        await notificationMutations.createNotification({
+          userId,
+          title: "Checked In",
+          message,
+          type: "attendance",
+          relatedId: data.id,
+          relatedType: "attendance_record",
+        });
+        // Refresh the in-app notification list / unread badge immediately
+        await queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+      } catch (error) {
+        console.error("Failed to create check-in notification:", error);
+      }
+
+      // Immediate local banner on this device
+      await presentLocalNotification("Checked In ✅", message, {
+        type: "attendance",
+        relatedType: "attendance_record",
+      });
     },
     onError: options?.onError,
     onMutate: options?.onMutate,
@@ -77,6 +108,34 @@ export const useCheckOut = (
         queryClient.invalidateQueries({ queryKey: ["salary"] }),
         queryClient.invalidateQueries({ queryKey: ["earnings"] }),
       ]);
+
+      // Notify the employee of their own check-out
+      const checkOutTime = data?.check_out_time
+        ? formatTime(data.check_out_time)
+        : formatTime(new Date());
+      const message = `You checked out at ${checkOutTime}.`;
+
+      // In-app notification (bell/history)
+      try {
+        await notificationMutations.createNotification({
+          userId,
+          title: "Checked Out",
+          message,
+          type: "attendance",
+          relatedId: data.id,
+          relatedType: "attendance_record",
+        });
+        // Refresh the in-app notification list / unread badge immediately
+        await queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+      } catch (error) {
+        console.error("Failed to create check-out notification:", error);
+      }
+
+      // Immediate local banner on this device
+      await presentLocalNotification("Checked Out 👋", message, {
+        type: "attendance",
+        relatedType: "attendance_record",
+      });
     },
     onError: options?.onError,
     onMutate: options?.onMutate,
@@ -125,16 +184,23 @@ export const useMarkAttendance = (
         queryClient.invalidateQueries({ queryKey: ["earnings"] }),
       ]);
 
-      // Create notification for employee (non-blocking)
+      // Create notification for employee (non-blocking).
+      // Include the check-in / check-out time HR set so the employee can see it.
       try {
+        const parts: string[] = [];
+        if (data.check_in_time) parts.push(`check-in ${formatClockTime(data.check_in_time)}`);
+        if (data.check_out_time) parts.push(`check-out ${formatClockTime(data.check_out_time)}`);
+        const detail = parts.length ? ` — ${parts.join(", ")}` : "";
+
         await notificationMutations.createNotification({
           userId: variables.userId,
           title: 'Attendance Marked',
-          message: `Your attendance for ${variables.date} has been marked by HR`,
+          message: `Your attendance for ${variables.date} has been marked by HR${detail}.`,
           type: 'attendance',
           relatedId: data.id,
           relatedType: 'attendance_record',
         });
+        await queryClient.invalidateQueries({ queryKey: notificationKeys.all });
       } catch (error) {
         console.error('Failed to create notification:', error);
       }
@@ -187,19 +253,31 @@ export const useUpdateAttendance = (
       ]);
 
       // Create notification for employee (non-blocking)
-      // Only notify if HR updated someone else's attendance (not self-update)
+      // Only notify if someone else (HR/admin) updated the attendance, not a self-update
       if (data.user_id && data.user_id !== userId) {
+        // Mention specifically the time(s) HR changed so the employee sees the
+        // new value (e.g. "check-in to 10:00 AM"). Only list fields that were
+        // actually part of this edit.
+        const updates = variables.updates;
+        const parts: string[] = [];
+        if (updates.check_in_time && data.check_in_time)
+          parts.push(`check-in to ${formatClockTime(data.check_in_time)}`);
+        if (updates.check_out_time && data.check_out_time)
+          parts.push(`check-out to ${formatClockTime(data.check_out_time)}`);
+        const detail = parts.length ? ` — ${parts.join(", ")}` : "";
+
         try {
           await notificationMutations.createNotification({
             userId: data.user_id,
-            title: 'Attendance Updated',
-            message: `Your attendance record for ${data.date} has been updated by HR`,
-            type: 'attendance',
+            title: "Attendance Updated",
+            message: `Your attendance for ${data.date} was updated by your employer${detail}.`,
+            type: "attendance",
             relatedId: data.id,
-            relatedType: 'attendance_record',
+            relatedType: "attendance_record",
           });
+          await queryClient.invalidateQueries({ queryKey: notificationKeys.all });
         } catch (error) {
-          console.error('Failed to create notification:', error);
+          console.error("Failed to create notification:", error);
         }
       }
     },

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, TextInput, StatusBar, ScrollView, Platform, RefreshControl } from 'react-native';
 import { useAlert } from '@/hooks/useAlert';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
@@ -20,8 +21,15 @@ export default function LeaveScreen() {
   const { success, error } = useAlert();
   const userId = user?.id || '';
 
+  const { apply } = useLocalSearchParams<{ apply?: string }>();
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+
+  // Auto-open the apply form when navigated here with ?apply=1
+  // (e.g. from the "Apply for Leave" shortcut on the notifications page).
+  useEffect(() => {
+    if (apply) setModalVisible(true);
+  }, [apply]);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [formData, setFormData] = useState({

@@ -16,7 +16,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, { FadeInUp } from "react-native-reanimated";
 import { Text } from "@/components/ui/Text";
 
 interface AttendanceActionBarProps {
@@ -97,8 +96,7 @@ export default function AttendanceActionBar({
   );
 
   return (
-    <Animated.View
-      entering={FadeInUp.delay(300).springify()}
+    <View
       style={[
         styles.container,
         { paddingBottom: Math.max(insets.bottom, Spacing.lg) },
@@ -113,7 +111,7 @@ export default function AttendanceActionBar({
           {content}
         </View>
       )}
-    </Animated.View>
+    </View>
   );
 }
 

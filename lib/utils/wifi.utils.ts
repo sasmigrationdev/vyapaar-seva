@@ -1,15 +1,15 @@
 import { WiFiVerificationStatus } from "@/lib/types";
+// Side-effect import: enables `shouldFetchWiFiSSID` on iOS. Must be configured
+// before any NetInfo usage, so it lives in a shared module that is also imported
+// first in app/_layout.tsx. Without it, `details.ssid` is always null on iPhone.
+import "@/lib/config/netinfo.config";
 import NetInfo from "@react-native-community/netinfo";
 import * as Location from "expo-location";
 import { PermissionsAndroid, Platform } from "react-native";
-
-// On iOS, NetInfo will NOT attempt to read the WiFi SSID unless `shouldFetchWiFiSSID`
-// is enabled. Without this, `state.details.ssid` is always null on iPhone, so office
-// WiFi verification can never match and attendance check-in/out gets blocked.
-// This requires the native requirements to be met as well (location permission +
-// NSLocationWhenInUseUsageDescription, and the "Access WiFi Information" entitlement),
-// otherwise enabling it leaks memory — both are configured in app.json's ios section.
-NetInfo.configure({ shouldFetchWiFiSSID: true });
+// iOS-only native SSID reader (NEHotspotNetwork). On modern iOS the NetInfo path
+// (CNCopyCurrentNetworkInfo) returns null even with the entitlement + precise
+// location, so we prefer this and fall back to NetInfo.
+import { getCurrentSSIDNative } from "@/modules/wifi-ssid";
 
 /**
  * Request location permissions required for WiFi SSID access
@@ -85,6 +85,18 @@ export const getCurrentWiFiSSID = async (): Promise<string | null> => {
   try {
     // iOS needs location authorization exercised before the SSID becomes readable.
     await primeiOSLocationForSSID();
+
+    // On iOS, prefer the native NEHotspotNetwork reader — the NetInfo/CNCopy path
+    // returns null on modern iOS even when everything is configured correctly.
+    if (Platform.OS === "ios") {
+      const nativeSsid = await getCurrentSSIDNative();
+      if (nativeSsid) {
+        const cleaned = nativeSsid.replace(/^"(.*)"$/, "$1");
+        console.log("WiFi SSID via NEHotspotNetwork:", cleaned);
+        return cleaned;
+      }
+      console.log("Native SSID read returned null, falling back to NetInfo");
+    }
 
     // Query the WiFi interface directly (not a possibly-cached bare fetch) so that,
     // together with `shouldFetchWiFiSSID`, the native SSID lookup is triggered on iOS.
@@ -217,6 +229,17 @@ export const getAvailableWiFiNetworks = async (): Promise<string[]> => {
     // at least once this session; prime it (shared helper, no-op on Android).
     await primeiOSLocationForSSID();
 
+    // On iOS, prefer the native NEHotspotNetwork reader (NetInfo returns null on
+    // modern iOS even when fully configured). If it succeeds we're done.
+    if (Platform.OS === "ios") {
+      const nativeSsid = await getCurrentSSIDNative();
+      if (nativeSsid) {
+        const cleaned = nativeSsid.replace(/^"(.*)"$/, "$1");
+        console.log("WiFi scan via NEHotspotNetwork:", cleaned);
+        return [cleaned];
+      }
+    }
+
     // Force a fresh read of the WiFi interface. Passing "wifi" (rather than a
     // bare fetch that may return a cached state) makes NetInfo query the WiFi
     // interface and, together with `shouldFetchWiFiSSID` (configured at the top
@@ -251,7 +274,34 @@ export const getAvailableWiFiNetworks = async (): Promise<string[]> => {
         Platform.OS === "ios"
           ? "On iPhone, reading the WiFi name requires Location Services to be ON and this app's location permission set to “While Using the App”. If it still can't be read, just type the network name manually below."
           : "Please make sure Location Services are enabled, then try again — or type the network name manually below.";
-      throw new Error(`Could not read your WiFi network name. ${hint}`);
+
+      // On-screen diagnostics so a TestFlight build self-reports the real cause
+      // (whether the OS reports WiFi at all, and whether the ssid key is present
+      // but null vs. missing entirely — the latter means the entitlement is
+      // inactive in this build). Also surfaces the location accuracy: a huge
+      // accuracy value means "Precise Location" is OFF, which blocks SSID reads.
+      let locDiag = "loc:?";
+      try {
+        const perm = await Location.getForegroundPermissionsAsync();
+        let acc: number | undefined;
+        try {
+          const pos = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Lowest,
+          });
+          acc = pos.coords.accuracy ?? undefined;
+        } catch {}
+        locDiag = `loc:${perm.status} acc:${acc != null ? Math.round(acc) : "n/a"}`;
+      } catch {}
+      const ssidKeyPresent = state.details
+        ? Object.prototype.hasOwnProperty.call(state.details, "ssid")
+        : false;
+      const diag =
+        `\n\n[diag] os:${Platform.OS} ${Platform.Version} | ` +
+        `type:${state.type} connected:${state.isConnected} | ` +
+        `ssidKey:${ssidKeyPresent} ssid:${String((state.details as any)?.ssid)} | ` +
+        locDiag;
+
+      throw new Error(`Could not read your WiFi network name. ${hint}${diag}`);
     }
 
     const ssid = rawSsid.replace(/^"(.*)"$/, "$1");
