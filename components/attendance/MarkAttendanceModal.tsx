@@ -19,7 +19,7 @@ import {
   getWeekdayShortName,
   isWorkingDay,
 } from "@/lib/utils/workingDays.utils";
-import { timeFromStoredTimestamp } from "@/lib/utils/date.utils";
+import { buildLocalDateTime, dateFromStoredTimestamp, isValidClockTime, timeFromStoredTimestamp } from "@/lib/utils/date.utils";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -156,6 +156,13 @@ export default function MarkAttendanceModal({
   // UTC-midnight record shown in IST) right after selecting a real time.
   const prefilledKeyRef = useRef<string>("");
 
+  // True once the admin has manually touched the time fields for the current
+  // (employee, date) selection. A background attendance refetch settling *after*
+  // they've typed must not re-run the prefill and clobber their entry — that
+  // async overwrite is what made a just-typed time snap to a 05:30-band value.
+  // Reset whenever the selection changes (modal open / employee / date).
+  const manuallyEditedRef = useRef(false);
+
   // Fetch break requests for existing record (including discovered records via date selection)
   const { data: breakRequests } = useBreakRequestsByAttendance(
     originalRecordId || existingRecord?.id || "",
@@ -178,17 +185,21 @@ export default function MarkAttendanceModal({
   // Reset and pre-fill form when modal opens or props change
   useEffect(() => {
     if (visible) {
+      // Fresh selection — the async prefill is allowed to populate until the
+      // admin types (see manuallyEditedRef).
+      manuallyEditedRef.current = false;
       if (existingRecord) {
         // Track the original record we're editing
         setOriginalRecordId(existingRecord.id);
         hasInitializedFromProp.current = true;
 
-        // Editing existing record
+        // Editing existing record. Derive dates in LOCAL tz to match the times
+        // (which render local), so check-in / check-out land on the right day.
         const checkInDate = existingRecord.check_in_time
-          ? new Date(existingRecord.check_in_time).toISOString().split("T")[0]
+          ? dateFromStoredTimestamp(existingRecord.check_in_time)
           : existingRecord.date;
         const checkOutDate = existingRecord.check_out_time
-          ? new Date(existingRecord.check_out_time).toISOString().split("T")[0]
+          ? dateFromStoredTimestamp(existingRecord.check_out_time)
           : checkInDate;
 
         setFormData({
@@ -243,6 +254,11 @@ export default function MarkAttendanceModal({
     // Skip if data is still loading
     if (isFetchingAttendance) return;
 
+    // Skip if the admin has already typed a time for this selection. A late
+    // refetch settling here would otherwise overwrite their entry with the
+    // stored (possibly 05:30-band) value — the "snaps back" bug.
+    if (manuallyEditedRef.current) return;
+
     // Only prefill ONCE per (employee, date). Later background refetches re-run
     // this effect; without this guard they'd re-apply the fetched record and
     // overwrite a time HR has since picked (the "reverts to 05:30" bug).
@@ -255,11 +271,13 @@ export default function MarkAttendanceModal({
       // DATA FOUND - Prefill with fetched data
       const record = existingAttendanceForDate[0];
 
+      // Local-tz dates (match the local-rendered times) so check-out doesn't get
+      // pinned to the wrong day and pushed into the 00:00–05:30 band.
       const checkInDate = record.check_in_time
-        ? new Date(record.check_in_time).toISOString().split("T")[0]
+        ? dateFromStoredTimestamp(record.check_in_time)
         : record.date;
       const checkOutDate = record.check_out_time
-        ? new Date(record.check_out_time).toISOString().split("T")[0]
+        ? dateFromStoredTimestamp(record.check_out_time)
         : checkInDate;
 
       setFormData(prev => ({
@@ -355,6 +373,17 @@ export default function MarkAttendanceModal({
       error("Error", "Please enter check-in time");
       return;
     }
+    // Guard against an empty/garbage time slipping through (e.g. the picker
+    // never committed). Without this it would build a local-midnight Date and
+    // store 12:00 AM — the low end of the corrupt 00:00–05:30 band.
+    if (!isValidClockTime(formData.checkInTime)) {
+      error("Invalid Time", "Please pick a valid check-in time");
+      return;
+    }
+    if (formData.checkOutTime && !isValidClockTime(formData.checkOutTime)) {
+      error("Invalid Time", "Please pick a valid check-out time");
+      return;
+    }
 
     // Validate check-out time is not in the future
     if (formData.checkOutTime) {
@@ -362,15 +391,14 @@ export default function MarkAttendanceModal({
         ? formData.checkOutDate
         : formData.date;
 
-      const [checkOutHour, checkOutMinute] = formData.checkOutTime
-        .split(":")
-        .map(Number);
-      const checkOutDateTime = new Date(checkOutDateToUse);
-      checkOutDateTime.setHours(checkOutHour, checkOutMinute, 0, 0);
+      const checkOutDateTime = buildLocalDateTime(
+        checkOutDateToUse,
+        formData.checkOutTime
+      );
 
       const now = new Date();
 
-      if (checkOutDateTime > now) {
+      if (checkOutDateTime && checkOutDateTime > now) {
         error("Invalid Time", "Check-out time cannot be in the future");
         return;
       }
@@ -451,27 +479,38 @@ export default function MarkAttendanceModal({
   };
 
   const proceedWithSubmit = () => {
-    // Convert local time to UTC ISO format
-    const [checkInHour, checkInMinute] = formData.checkInTime.split(":");
-    const checkInDate = new Date(formData.date);
-    checkInDate.setHours(parseInt(checkInHour), parseInt(checkInMinute), 0, 0);
-    const checkInDateTime = checkInDate.toISOString();
+    // Convert the admin's local wall-clock entry to a UTC ISO instant. We build
+    // the Date straight from date + time parts (see buildLocalDateTime) rather
+    // than `new Date(date)` + setHours, so a back-dated entry stores exactly the
+    // time picked instead of drifting into the 00:00–05:30 IST band.
+    const checkInInstant = buildLocalDateTime(
+      formData.date,
+      formData.checkInTime
+    );
+    // buildLocalDateTime returns null for missing/invalid input. handleSubmit
+    // already validates, but guard here too so a bad value can never be saved
+    // as a bogus 00:00–05:30 instant.
+    if (!checkInInstant) {
+      error("Invalid Time", "Please pick a valid check-in time");
+      return;
+    }
+    const checkInDateTime = checkInInstant.toISOString();
 
     let checkOutDateTime: string | undefined;
     if (formData.checkOutTime) {
-      const [checkOutHour, checkOutMinute] = formData.checkOutTime.split(":");
       // Use separate check-out date if enabled, otherwise use check-in date
       const checkOutDateToUse = formData.useSeparateCheckOutDate
         ? formData.checkOutDate
         : formData.date;
-      const checkOutDate = new Date(checkOutDateToUse);
-      checkOutDate.setHours(
-        parseInt(checkOutHour),
-        parseInt(checkOutMinute),
-        0,
-        0
+      const checkOutInstant = buildLocalDateTime(
+        checkOutDateToUse,
+        formData.checkOutTime
       );
-      checkOutDateTime = checkOutDate.toISOString();
+      if (!checkOutInstant) {
+        error("Invalid Time", "Please pick a valid check-out time");
+        return;
+      }
+      checkOutDateTime = checkOutInstant.toISOString();
     }
 
     // Parse overtime hours - default to 0 if empty
@@ -605,22 +644,19 @@ export default function MarkAttendanceModal({
   const hoursPreview = useMemo(() => {
     if (!formData.checkInTime || !formData.checkOutTime) return null;
 
-    const [checkInHour, checkInMinute] = formData.checkInTime
-      .split(":")
-      .map(Number);
-    const [checkOutHour, checkOutMinute] = formData.checkOutTime
-      .split(":")
-      .map(Number);
-
-    const checkInDate = new Date(formData.date);
-    checkInDate.setHours(checkInHour, checkInMinute, 0, 0);
+    const checkInDate = buildLocalDateTime(formData.date, formData.checkInTime);
 
     // Use separate check-out date if enabled
     const checkOutDateToUse = formData.useSeparateCheckOutDate
       ? formData.checkOutDate
       : formData.date;
-    const checkOutDate = new Date(checkOutDateToUse);
-    checkOutDate.setHours(checkOutHour, checkOutMinute, 0, 0);
+    const checkOutDate = buildLocalDateTime(
+      checkOutDateToUse,
+      formData.checkOutTime
+    );
+
+    // Either part invalid -> no preview (the form validation blocks submit).
+    if (!checkInDate || !checkOutDate) return null;
 
     const diffMs = checkOutDate.getTime() - checkInDate.getTime();
     const grossHours = diffMs / (1000 * 60 * 60);
@@ -787,6 +823,7 @@ export default function MarkAttendanceModal({
                                 // Reset the entry fields when switching employee so
                                 // a late attendance refetch can't overwrite times
                                 // entered for the newly-selected person.
+                                manuallyEditedRef.current = false;
                                 setFormData((prev) => ({
                                   ...prev,
                                   userId: employee.id,
@@ -825,6 +862,7 @@ export default function MarkAttendanceModal({
                 // Reset the entry for the newly-selected date up-front. Doing the
                 // reset here (rather than in the async prefill effect) means a
                 // late attendance refetch can't wipe times HR enters for this date.
+                manuallyEditedRef.current = false;
                 setFormData((prev) => ({
                   ...prev,
                   date,
@@ -856,9 +894,10 @@ export default function MarkAttendanceModal({
             {/* Check-in Time */}
             <TimePicker
               value={formData.checkInTime}
-              onChange={(time) =>
-                setFormData((prev) => ({ ...prev, checkInTime: time }))
-              }
+              onChange={(time) => {
+                manuallyEditedRef.current = true;
+                setFormData((prev) => ({ ...prev, checkInTime: time }));
+              }}
               label="Check-in Time"
               required
               iconName="log-in-outline"
@@ -868,9 +907,10 @@ export default function MarkAttendanceModal({
             {/* Check-out Time */}
             <TimePicker
               value={formData.checkOutTime}
-              onChange={(time) =>
-                setFormData((prev) => ({ ...prev, checkOutTime: time }))
-              }
+              onChange={(time) => {
+                manuallyEditedRef.current = true;
+                setFormData((prev) => ({ ...prev, checkOutTime: time }));
+              }}
               label="Check-out Time"
               iconName="log-out-outline"
               iconColor={Colors.error}

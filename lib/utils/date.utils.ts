@@ -67,6 +67,80 @@ export const timeFromStoredTimestamp = (
 };
 
 /**
+ * True when `t` is a well-formed 24-hour wall-clock string ("H:mm" / "HH:mm")
+ * with an in-range hour (0–23) and minute (0–59). Used to reject empty or
+ * garbage time input BEFORE it can be built into a Date and silently stored as
+ * local midnight (which reads back as 12:00 AM — the low end of the corrupt
+ * 00:00–05:30 IST band).
+ */
+export const isValidClockTime = (t: string | null | undefined): t is string => {
+  if (typeof t !== 'string' || !/^\d{1,2}:\d{2}$/.test(t)) return false;
+  const [hour, minute] = t.split(':').map(Number);
+  return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+};
+
+/**
+ * Build a Date from a local calendar date ("YYYY-MM-DD") and wall-clock time
+ * ("HH:mm"), interpreted in the device's local timezone. Returns `null` when
+ * either part is missing/invalid — callers MUST treat that as "no valid time"
+ * and refuse to save, rather than storing a bogus instant.
+ *
+ * Why not `new Date(dateStr)` + `.setHours()`: a date-only string parses as UTC
+ * midnight, but `.setHours()` then mutates in local time. Mixing the two shifts
+ * the calendar day in any timezone with a non-zero offset and is exactly what
+ * pushed HR-entered times into the 00:00–05:30 IST band (UTC+5:30). Constructing
+ * straight from numeric parts keeps the wall-clock the admin typed on the exact
+ * date they picked, so `.toISOString()` stores the correct instant and
+ * `format(d, 'HH:mm')` reads the same value back — even for back-dated entries.
+ *
+ * Boundary disambiguation: a genuine time that lands on EXACT UTC midnight
+ * (e.g. 05:30 IST -> 00:00:00Z) is indistinguishable from the legacy corruption
+ * sentinel that `timeFromStoredTimestamp` treats as "unset". To stop a real
+ * 05:30 check-in from being eaten, we nudge such instants by one second
+ * (00:00:01Z) — invisible at HH:mm precision but no longer the exact sentinel.
+ */
+export const buildLocalDateTime = (
+  dateStr: string,
+  timeStr: string
+): Date | null => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '') || !isValidClockTime(timeStr)) {
+    return null;
+  }
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const [hour, minute] = timeStr.split(':').map(Number);
+  const d = new Date(year, month - 1, day, hour, minute, 0, 0);
+  if (
+    d.getUTCHours() === 0 &&
+    d.getUTCMinutes() === 0 &&
+    d.getUTCSeconds() === 0 &&
+    d.getUTCMilliseconds() === 0
+  ) {
+    d.setUTCSeconds(1);
+  }
+  return d;
+};
+
+/**
+ * Extract the LOCAL calendar date ("YYYY-MM-DD") from a stored timestamp.
+ *
+ * Counterpart to timeFromStoredTimestamp: the Mark Attendance modal shows times
+ * in local tz, so the date it pairs them with must be local too. Using
+ * `.toISOString()` (UTC) here instead put the check-in / check-out date a day off
+ * whenever the local time sits near the UTC boundary — which wrongly flipped
+ * `useSeparateCheckOutDate` on and saved the check-out against the wrong day,
+ * dropping it into the 00:00–05:30 IST band. Keeping the date local matches how
+ * the time is rendered so the round-trip stays stable.
+ */
+export const dateFromStoredTimestamp = (
+  value: string | null | undefined
+): string => {
+  if (!value) return '';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return '';
+  return format(d, 'yyyy-MM-dd');
+};
+
+/**
  * Format datetime to readable format
  */
 export const formatDateTime = (date: Date | string): string => {
