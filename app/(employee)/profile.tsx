@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 import { useAuth } from '@/hooks/auth/useAuth';
 import { useSignOut } from '@/hooks/mutations/useAuthMutations';
 import { useResetPassword } from '@/hooks/mutations/useUserMutations';
@@ -767,7 +768,7 @@ export default function ProfileScreen() {
 
         {/* Footer */}
         <Animated.View entering={FadeInDown.delay(450).springify()} style={styles.footer}>
-          <Text style={styles.footerText}>Version 1.0.0</Text>
+          <Text style={styles.footerText}>Version {Constants.expoConfig?.version ?? '1.0.0'}</Text>
           <Text style={styles.footerSubtext}>Salary Book & Attendance App</Text>
         </Animated.View>
       </ScrollView>
