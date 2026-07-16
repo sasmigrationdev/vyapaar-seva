@@ -26,29 +26,59 @@ export default function TimePicker({
 }: TimePickerProps) {
   const [showPicker, setShowPicker] = useState(false);
 
-  // Convert HH:MM string to Date object
+  // Convert HH:MM string to a Date (seconds/ms zeroed so the value is stable).
   const getDateFromTime = (timeString: string): Date => {
-    const now = new Date();
-    if (!timeString) return now;
-
+    const base = new Date();
+    if (!timeString) {
+      base.setSeconds(0, 0);
+      return base;
+    }
     const [hours, minutes] = timeString.split(':').map(Number);
-    now.setHours(hours || 0);
-    now.setMinutes(minutes || 0);
-    return now;
+    base.setHours(hours || 0, minutes || 0, 0, 0);
+    return base;
   };
 
-  const selectedTime = getDateFromTime(value);
+  // Stable Date backing the native picker. Deriving the picker's `value` from
+  // `new Date()` on every render made it drift each render, so on iOS the spinner
+  // kept snapping back while the user scrolled and the time couldn't be set. We
+  // hold a stable Date and only change it when the user actually moves the wheel.
+  const [pickerDate, setPickerDate] = useState<Date>(() => getDateFromTime(value));
 
-  const handleTimeChange = (_event: any, selectedDate?: Date) => {
+  const emitTime = (d: Date) => {
+    const hours = d.getHours().toString().padStart(2, '0');
+    const minutes = d.getMinutes().toString().padStart(2, '0');
+    onChange(`${hours}:${minutes}`);
+  };
+
+  const openPicker = () => {
+    if (disabled) return;
+    setPickerDate(getDateFromTime(value));
+    setShowPicker(true);
+  };
+
+  const handleTimeChange = (event: any, selectedDate?: Date) => {
+    // Android: the dialog commits and dismisses in a single step.
     if (Platform.OS === 'android') {
       setShowPicker(false);
+      if (event?.type === 'set' && selectedDate) {
+        emitTime(selectedDate);
+      }
+      return;
     }
 
+    // iOS spinner: only track the wheel LOCALLY while the user scrolls.
+    // Committing to the parent form on every tick re-renders the modal, and the
+    // controlled `value` then fights the native wheel — which made it snap back
+    // to the prefilled time (05:30). We commit once, on Done (confirmIOSTime).
     if (selectedDate) {
-      const hours = selectedDate.getHours().toString().padStart(2, '0');
-      const minutes = selectedDate.getMinutes().toString().padStart(2, '0');
-      onChange(`${hours}:${minutes}`);
+      setPickerDate(selectedDate);
     }
+  };
+
+  // iOS only: commit the wheel's current value when the user taps Done.
+  const confirmIOSTime = () => {
+    emitTime(pickerDate);
+    setShowPicker(false);
   };
 
   const formatDisplayTime = (timeString: string) => {
@@ -77,7 +107,7 @@ export default function TimePicker({
 
       <TouchableOpacity
         style={[styles.inputWrapper, disabled && styles.inputWrapperDisabled]}
-        onPress={() => !disabled && setShowPicker(true)}
+        onPress={openPicker}
         activeOpacity={disabled ? 1 : 0.7}
         disabled={disabled}
         accessibilityLabel={`${label || 'Time'}: ${value ? formatDisplayTime(value) : 'not selected'}${required ? ', required' : ''}${disabled ? ', disabled' : ''}`}
@@ -94,7 +124,7 @@ export default function TimePicker({
 
       {showPicker && (
         <DateTimePicker
-          value={selectedTime}
+          value={pickerDate}
           mode="time"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
           onChange={handleTimeChange}
@@ -104,7 +134,7 @@ export default function TimePicker({
       {Platform.OS === 'ios' && showPicker && (
         <View style={styles.iosPickerActions}>
           <TouchableOpacity
-            onPress={() => setShowPicker(false)}
+            onPress={confirmIOSTime}
             style={styles.iosButton}
             accessibilityLabel="Done selecting time"
             accessibilityRole="button"

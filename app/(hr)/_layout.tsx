@@ -98,6 +98,13 @@ export default function HRLayout() {
         }}
       />
       <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null,
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
         name="leave"
         options={{
           href: null,

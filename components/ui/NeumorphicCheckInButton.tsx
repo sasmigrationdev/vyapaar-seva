@@ -12,6 +12,7 @@ import * as Haptics from 'expo-haptics';
 import { Text } from '@/components/ui/Text';
 import { Colors, AnimationPresets } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { safeRadius } from '@/lib/utils/style.utils';
 
 interface NeumorphicCheckInButtonProps {
   onPress: () => void;
@@ -352,7 +353,7 @@ export function NeumorphicCheckInButton({
               {
                 width: size - innerMargin * 2,
                 height: size - innerMargin * 2,
-                borderRadius: (size - innerMargin * 2) / 2,
+                borderRadius: safeRadius((size - innerMargin * 2) / 2),
               },
               disabled && styles.disabledInner,
             ]}

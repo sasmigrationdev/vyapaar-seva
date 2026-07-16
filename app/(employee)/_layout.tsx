@@ -132,6 +132,13 @@ export default function EmployeeLayout() {
       />
       {/* Hide these screens from bottom tabs */}
       <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null,
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
         name="leave"
         options={{
           href: null,

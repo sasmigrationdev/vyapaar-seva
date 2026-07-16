@@ -28,6 +28,7 @@ import { useMyBreakRequests } from "@/hooks/queries/useBreakRequests";
 import { useCurrentMonthEarnings } from "@/hooks/queries/useEarnings";
 import { useEmployeeJoinRequests } from "@/hooks/queries/useEmployerRequests";
 import { useCurrentEmployment } from "@/hooks/queries/useEmploymentHistory";
+import { useUnreadNotificationsCount } from "@/hooks/queries/useNotification";
 import { useOvertimeRequestByAttendance } from "@/hooks/queries/useOvertimeRequests";
 import { useLatestSalary } from "@/hooks/queries/useSalary";
 import { useAlert } from "@/hooks/useAlert";
@@ -196,6 +197,10 @@ export default function EmployeeDashboard() {
   const { user } = useAuth();
   const { success, error } = useAlert();
   const userId = user?.id || "";
+
+  const { data: unreadCount = 0 } = useUnreadNotificationsCount(userId, {
+    enabled: !!userId,
+  });
 
   const {
     data: todayAttendance,
@@ -604,14 +609,24 @@ export default function EmployeeDashboard() {
             <View style={styles.topBarActions}>
               <TouchableOpacity
                 style={styles.topBarButton}
-                onPress={() => router.push("/(employee)/leave")}
+                onPress={() => router.push("/(employee)/notifications")}
                 activeOpacity={0.7}
+                accessibilityLabel={`Notifications${
+                  unreadCount > 0 ? `, ${unreadCount} unread` : ""
+                }`}
               >
                 <Ionicons
                   name="notifications-outline"
                   size={22}
                   color="#FFFFFF"
                 />
+                {unreadCount > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.topBarButton}
@@ -1460,6 +1475,25 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: Colors.error,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF",
+  },
+  notificationBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "700",
   },
   avatarCircle: {
     width: 44,

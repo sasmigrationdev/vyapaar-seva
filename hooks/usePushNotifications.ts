@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Platform } from "react-native";
-import * as Notifications from "expo-notifications";
+// Type-only import: erased at build time so `expo-notifications` is NOT loaded
+// just to reference its types. The runtime module is required lazily below.
+import type * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import Constants from "expo-constants";
 import { useAuth } from "@/hooks/auth/useAuth";
@@ -9,6 +11,14 @@ import { useRouter } from "expo-router";
 
 // Check if running in Expo Go (push notifications not supported in SDK 53+)
 const isExpoGo = Constants.appOwnership === "expo";
+
+// Load the native module lazily so it is never evaluated inside Expo Go, where
+// SDK 53+ removed notifications and logs an error the moment it is loaded.
+// All runtime usages below are already guarded by `!isExpoGo`, so this is
+// non-null wherever it's actually called.
+const NativeNotifications: typeof import("expo-notifications") | null = isExpoGo
+  ? null
+  : require("expo-notifications");
 
 // Check if Firebase is properly configured (for Android FCM)
 const isFirebaseConfigured = (): boolean => {
@@ -21,7 +31,7 @@ const isFirebaseConfigured = (): boolean => {
 // Wrapped in try-catch to prevent crashes if native module isn't ready
 if (!isExpoGo) {
   try {
-    Notifications.setNotificationHandler({
+    NativeNotifications!.setNotificationHandler({
       handleNotification: async () => ({
         shouldShowAlert: true,
         shouldPlaySound: true,
@@ -120,12 +130,12 @@ export const usePushNotifications = () => {
 
     try {
       // Check existing permissions
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      const { status: existingStatus } = await NativeNotifications!.getPermissionsAsync();
       let finalStatus = existingStatus;
 
       // Request permission if not granted
       if (existingStatus !== "granted") {
-        const { status } = await Notifications.requestPermissionsAsync();
+        const { status } = await NativeNotifications!.requestPermissionsAsync();
         finalStatus = status;
       }
 
@@ -142,16 +152,16 @@ export const usePushNotifications = () => {
 
       // Get Expo push token
       const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-      const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+      const tokenData = await NativeNotifications!.getExpoPushTokenAsync({ projectId });
       const token = tokenData.data;
 
       setState((prev) => ({ ...prev, expoPushToken: token, error: null }));
 
       // Configure Android channel
       if (Platform.OS === "android") {
-        await Notifications.setNotificationChannelAsync("default", {
+        await NativeNotifications!.setNotificationChannelAsync("default", {
           name: "Default",
-          importance: Notifications.AndroidImportance.MAX,
+          importance: NativeNotifications!.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: "#138808",
           sound: "default",
@@ -181,7 +191,7 @@ export const usePushNotifications = () => {
 
         // Try getting native device token as fallback
         try {
-          const deviceTokenData = await Notifications.getDevicePushTokenAsync();
+          const deviceTokenData = await NativeNotifications!.getDevicePushTokenAsync();
           const deviceToken = deviceTokenData.data;
           console.log("Got native device token as fallback:", deviceToken);
 
@@ -322,6 +332,16 @@ export const usePushNotifications = () => {
     [user?.role, router]
   );
 
+  // Keep the latest tap-handler in a ref so the init effect can call it without
+  // listing it as a dependency. In expo-router v6 `useRouter()` returns a fresh
+  // object each render, so depending on `handleNotificationResponse` directly
+  // tears down + re-runs the init effect every render — which resets the init
+  // guard and re-registers the push token in an infinite loop (JS thread freeze).
+  const handleNotificationResponseRef = useRef(handleNotificationResponse);
+  useEffect(() => {
+    handleNotificationResponseRef.current = handleNotificationResponse;
+  }, [handleNotificationResponse]);
+
   // Initialize push notifications
   useEffect(() => {
     if (!user?.id) return;
@@ -349,16 +369,17 @@ export const usePushNotifications = () => {
     initializePushNotifications();
 
     // Listen for incoming notifications (foreground)
-    notificationListener.current = Notifications.addNotificationReceivedListener(
+    notificationListener.current = NativeNotifications!.addNotificationReceivedListener(
       (notification) => {
         setState((prev) => ({ ...prev, notification }));
         console.log("Notification received:", notification);
       }
     );
 
-    // Listen for notification taps
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(
-      handleNotificationResponse
+    // Listen for notification taps. Call through the ref so the latest handler
+    // (current role/router) is used without adding it as an effect dependency.
+    responseListener.current = NativeNotifications!.addNotificationResponseReceivedListener(
+      (response) => handleNotificationResponseRef.current(response)
     );
 
     return () => {
@@ -368,10 +389,16 @@ export const usePushNotifications = () => {
       if (responseListener.current) {
         responseListener.current.remove();
       }
-      // Reset initialization flag on cleanup (user logout)
+      // Reset initialization flag on cleanup (user logout). This effect now
+      // depends ONLY on `user?.id`, so this cleanup runs solely when the user
+      // actually changes or the hook unmounts — never on every render — so it
+      // can no longer defeat the init guard mid-session.
       hasInitializedForUser.current = null;
     };
-  }, [user?.id, registerForPushNotifications, savePushToken, handleNotificationResponse]);
+    // Depend only on `user?.id`. The registration callbacks are stable / reached
+    // via ref; adding them re-registers the token in a loop (see ref above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // Clear push token on logout
   const clearPushToken = useCallback(async () => {

@@ -19,6 +19,7 @@ import {
   getWeekdayShortName,
   isWorkingDay,
 } from "@/lib/utils/workingDays.utils";
+import { timeFromStoredTimestamp } from "@/lib/utils/date.utils";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -35,6 +36,7 @@ import {
 } from "react-native";
 import { Text } from "@/components/ui/Text";
 import { Colors, Spacing, BorderRadius, Shadows, StatusColors, FontFamily } from "@/constants/theme";
+import AlertModal, { AlertType, AlertButton } from "@/components/ui/AlertModal";
 import { useAlert } from "@/hooks/useAlert";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -55,7 +57,65 @@ export default function MarkAttendanceModal({
 }: MarkAttendanceModalProps) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { success, error, info, confirmDestructive } = useAlert();
+
+  // Success dialogs use the *global* (root) alert, shown only AFTER this feature
+  // modal has fully dismissed (see finishWithSuccess). Overlapping two RN modals
+  // in the same frame hangs iOS. Errors/confirmations, which keep this modal
+  // open, use the local in-modal alert below instead.
+  const { success: showGlobalSuccess } = useAlert();
+
+  // Local alert state.
+  //
+  // We deliberately do NOT use the global `useAlert()` here: that AlertModal is
+  // mounted once at the app root, and on iOS a root-level <Modal> cannot present
+  // on top of this feature <Modal> — it renders behind it (or not at all), so
+  // the delete-confirmation and success/error dialogs were invisible on iPhone,
+  // which made "mark" and "delete" appear to do nothing. Rendering our own
+  // AlertModal *inside* this Modal presents it on top correctly on iOS.
+  const [alertState, setAlertState] = useState<{
+    visible: boolean;
+    title: string;
+    message?: string;
+    type: AlertType;
+    buttons: AlertButton[];
+  }>({ visible: false, title: "", type: "info", buttons: [] });
+
+  const hideAlert = () => setAlertState((prev) => ({ ...prev, visible: false }));
+
+  const error = (title: string, message?: string, onOk?: () => void) =>
+    setAlertState({
+      visible: true,
+      title,
+      message,
+      type: "error",
+      buttons: [{ text: "OK", style: "default", onPress: onOk }],
+    });
+
+  const info = (title: string, message?: string, onOk?: () => void) =>
+    setAlertState({
+      visible: true,
+      title,
+      message,
+      type: "info",
+      buttons: [{ text: "OK", style: "default", onPress: onOk }],
+    });
+
+  const confirmDestructive = (
+    title: string,
+    message: string,
+    onConfirm: () => void
+  ) =>
+    setAlertState({
+      visible: true,
+      title,
+      message,
+      type: "error",
+      buttons: [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: onConfirm },
+      ],
+    });
+
   const { data: employees } = useAllUsers({
     role: "employee",
     organizationId: user?.organization_id || "",
@@ -88,6 +148,13 @@ export default function MarkAttendanceModal({
   // Track if we've initialized from the existingRecord prop
   // This prevents the prefill effect from overwriting initial data
   const hasInitializedFromProp = useRef(false);
+
+  // Tracks the (employee|date) combo we've already prefilled from the fetched
+  // record. The prefill effect runs again on every background refetch; without
+  // this guard it would re-apply the stored record time and clobber a time HR
+  // just picked — which is what made the field snap back to 05:30 (a
+  // UTC-midnight record shown in IST) right after selecting a real time.
+  const prefilledKeyRef = useRef<string>("");
 
   // Fetch break requests for existing record (including discovered records via date selection)
   const { data: breakRequests } = useBreakRequestsByAttendance(
@@ -127,12 +194,8 @@ export default function MarkAttendanceModal({
         setFormData({
           userId: existingRecord.user_id,
           date: checkInDate,
-          checkInTime: existingRecord.check_in_time
-            ? new Date(existingRecord.check_in_time).toTimeString().slice(0, 5)
-            : "",
-          checkOutTime: existingRecord.check_out_time
-            ? new Date(existingRecord.check_out_time).toTimeString().slice(0, 5)
-            : "",
+          checkInTime: timeFromStoredTimestamp(existingRecord.check_in_time),
+          checkOutTime: timeFromStoredTimestamp(existingRecord.check_out_time),
           checkOutDate: checkOutDate,
           useSeparateCheckOutDate: checkInDate !== checkOutDate,
           notes: existingRecord.notes || "",
@@ -180,6 +243,13 @@ export default function MarkAttendanceModal({
     // Skip if data is still loading
     if (isFetchingAttendance) return;
 
+    // Only prefill ONCE per (employee, date). Later background refetches re-run
+    // this effect; without this guard they'd re-apply the fetched record and
+    // overwrite a time HR has since picked (the "reverts to 05:30" bug).
+    const key = `${formData.userId}|${formData.date}`;
+    if (prefilledKeyRef.current === key) return;
+    prefilledKeyRef.current = key;
+
     // Check if we have attendance data for this combination
     if (existingAttendanceForDate && existingAttendanceForDate.length > 0) {
       // DATA FOUND - Prefill with fetched data
@@ -194,12 +264,8 @@ export default function MarkAttendanceModal({
 
       setFormData(prev => ({
         ...prev,  // Keep userId and date
-        checkInTime: record.check_in_time
-          ? new Date(record.check_in_time).toTimeString().slice(0, 5)
-          : "",
-        checkOutTime: record.check_out_time
-          ? new Date(record.check_out_time).toTimeString().slice(0, 5)
-          : "",
+        checkInTime: timeFromStoredTimestamp(record.check_in_time),
+        checkOutTime: timeFromStoredTimestamp(record.check_out_time),
         checkOutDate: checkOutDate,
         useSeparateCheckOutDate: checkInDate !== checkOutDate,
         notes: record.notes || "",
@@ -209,42 +275,40 @@ export default function MarkAttendanceModal({
 
       // Update tracking to reflect we're now editing this record
       setOriginalRecordId(record.id);
-    } else {
-      // NO DATA FOUND - Clear fields for new attendance entry
-      setFormData(prev => ({
-        ...prev,  // Keep userId and date
-        checkInTime: "",
-        checkOutTime: "",
-        checkOutDate: prev.date,
-        useSeparateCheckOutDate: false,
-        notes: "",
-        overtimeHours: "",
-        overtimeReason: "",
-      }));
-
-      // Clear the original record ID since we're creating new attendance
-      setOriginalRecordId("");
     }
+    // NO DATA FOUND: intentionally do nothing here. The employee/date change
+    // handlers already reset the form for a fresh entry. Clearing on this async
+    // query settle would wipe the times HR types in while the attendance fetch
+    // for a newly-selected (e.g. previous) date is still in flight — which is
+    // exactly why "marking time for a previous date" appeared broken.
   }, [formData.userId, formData.date, existingAttendanceForDate, isFetchingAttendance, existingRecord]);
+
+  // Close this modal, then show the success dialog only AFTER it has fully
+  // dismissed. The success alert is the root-level <Modal>; showing it while
+  // this feature <Modal> is still dismissing puts two stacked RN modals through
+  // a state change in the same frame, which hangs the UI on iOS. Deferring past
+  // the dismiss animation guarantees only one modal is ever on screen.
+  const finishWithSuccess = (message: string) => {
+    onClose();
+    resetForm();
+    setTimeout(() => {
+      showGlobalSuccess("Success", message);
+    }, 450);
+  };
 
   const markMutation = useMarkAttendance(user?.id || "", {
     onSuccess: async () => {
-      // The mutation hook handles cache invalidation automatically
-      success("Success", "Attendance marked successfully");
-      onClose();
-      resetForm();
+      finishWithSuccess("Attendance marked successfully");
     },
     onError: (err) => {
       error("Error", err.message || "Failed to mark attendance");
     },
   });
 
-  const updateMutation = useUpdateAttendance(formData.userId, {
+  // Pass the editor's (HR/admin) id so the hook notifies the *employee* being edited.
+  const updateMutation = useUpdateAttendance(user?.id || "", {
     onSuccess: async () => {
-      // The mutation hook handles cache invalidation automatically
-      success("Success", "Attendance updated successfully");
-      onClose();
-      resetForm();
+      finishWithSuccess("Attendance updated successfully");
     },
     onError: (err) => {
       error("Error", err.message || "Failed to update attendance");
@@ -253,10 +317,7 @@ export default function MarkAttendanceModal({
 
   const deleteMutation = useDeleteAttendance({
     onSuccess: async () => {
-      // The mutation hook handles cache invalidation automatically
-      success("Success", "Attendance deleted successfully");
-      onClose();
-      resetForm();
+      finishWithSuccess("Attendance deleted successfully");
     },
     onError: (err) => {
       error("Error", err.message || "Failed to delete attendance");
@@ -723,10 +784,20 @@ export default function MarkAttendanceModal({
                               key={employee.id}
                               style={styles.dropdownItem}
                               onPress={() => {
-                                setFormData({
-                                  ...formData,
+                                // Reset the entry fields when switching employee so
+                                // a late attendance refetch can't overwrite times
+                                // entered for the newly-selected person.
+                                setFormData((prev) => ({
+                                  ...prev,
                                   userId: employee.id,
-                                });
+                                  checkInTime: "",
+                                  checkOutTime: "",
+                                  useSeparateCheckOutDate: false,
+                                  notes: "",
+                                  overtimeHours: "",
+                                  overtimeReason: "",
+                                }));
+                                setOriginalRecordId("");
                                 setShowEmployeeDropdown(false);
                                 setSearchTerm("");
                               }}
@@ -751,7 +822,21 @@ export default function MarkAttendanceModal({
             <DatePicker
               value={formData.date}
               onChange={(date) => {
-                setFormData({ ...formData, date });
+                // Reset the entry for the newly-selected date up-front. Doing the
+                // reset here (rather than in the async prefill effect) means a
+                // late attendance refetch can't wipe times HR enters for this date.
+                setFormData((prev) => ({
+                  ...prev,
+                  date,
+                  checkInTime: "",
+                  checkOutTime: "",
+                  checkOutDate: date,
+                  useSeparateCheckOutDate: false,
+                  notes: "",
+                  overtimeHours: "",
+                  overtimeReason: "",
+                }));
+                setOriginalRecordId("");
                 // Reset the initialization flag to allow prefilling for the new date
                 hasInitializedFromProp.current = false;
               }}
@@ -772,7 +857,7 @@ export default function MarkAttendanceModal({
             <TimePicker
               value={formData.checkInTime}
               onChange={(time) =>
-                setFormData({ ...formData, checkInTime: time })
+                setFormData((prev) => ({ ...prev, checkInTime: time }))
               }
               label="Check-in Time"
               required
@@ -784,7 +869,7 @@ export default function MarkAttendanceModal({
             <TimePicker
               value={formData.checkOutTime}
               onChange={(time) =>
-                setFormData({ ...formData, checkOutTime: time })
+                setFormData((prev) => ({ ...prev, checkOutTime: time }))
               }
               label="Check-out Time"
               iconName="log-out-outline"
@@ -1129,6 +1214,17 @@ export default function MarkAttendanceModal({
         </View>
       </View>
       </KeyboardAvoidingView>
+
+      {/* Local alert — rendered inside this Modal so it presents on top of the
+          feature modal on iOS (a root-level alert Modal renders behind it). */}
+      <AlertModal
+        visible={alertState.visible}
+        title={alertState.title}
+        message={alertState.message}
+        type={alertState.type}
+        buttons={alertState.buttons}
+        onClose={hideAlert}
+      />
     </Modal>
   );
 }

@@ -19,6 +19,7 @@ import { usePendingJoinRequests } from "@/hooks/queries/useEmployerRequests";
 import { useHRPendingLeaveRequests } from "@/hooks/queries/useLeave";
 import { useOrganization } from "@/hooks/queries/useOrganization";
 import { usePendingOvertimeCount } from "@/hooks/queries/useOvertimeRequests";
+import { useUnreadNotificationsCount } from "@/hooks/queries/useNotification";
 import { useAllUsers } from "@/hooks/queries/useUser";
 import { useAutoRejectExpiredBreaksForOrg } from "@/hooks/useAutoRejectExpiredBreaksForOrg";
 import { formatDate, formatDateToISO } from "@/lib/utils/date.utils";
@@ -34,13 +35,18 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { FadeInDown, LayoutAnimationConfig } from "react-native-reanimated";
 
 export default function HRDashboard() {
   const router = useRouter();
   const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const today = formatDateToISO(new Date());
+
+  const { data: unreadNotificationsCount = 0 } = useUnreadNotificationsCount(
+    user?.id || "",
+    { enabled: !!user?.id }
+  );
 
   // Memoize filter objects to prevent React Compiler cache size issues
   const organizationId = user?.organization_id || "";
@@ -262,8 +268,15 @@ export default function HRDashboard() {
     },
   ];
 
+  // Suppress Reanimated entering layout animations for this whole subtree.
+  // This screen mounts many nested entering animations at once (here + inside
+  // TeamAttendanceDonut / MarketingBanner / ComingSoonCarousel). On the New
+  // Architecture (Fabric), that burst of nested layout animations firing during
+  // the navigation transition wedges the commit path and freezes the JS thread
+  // on mount. skipEntering disables them for all descendants via context.
   return (
-    <View style={styles.container}>
+    <LayoutAnimationConfig skipEntering>
+      <View style={styles.container}>
       <StatusBar
         barStyle="light-content"
         backgroundColor="transparent"
@@ -305,14 +318,19 @@ export default function HRDashboard() {
               {/* Notification Bell */}
               <TouchableOpacity
                 style={styles.headerIconButton}
-                onPress={() => router.push("/(hr)/leave")}
+                onPress={() => router.push("/(hr)/notifications")}
                 activeOpacity={0.7}
+                accessibilityLabel={`Notifications${
+                  unreadNotificationsCount > 0
+                    ? `, ${unreadNotificationsCount} unread`
+                    : ""
+                }`}
               >
                 <Ionicons name="notifications-outline" size={20} color="#1A1A1A" />
-                {totalPendingApprovals > 0 && (
+                {unreadNotificationsCount > 0 && (
                   <View style={styles.notificationBadge}>
                     <Text style={styles.notificationBadgeText}>
-                      {totalPendingApprovals > 9 ? "9+" : totalPendingApprovals}
+                      {unreadNotificationsCount > 9 ? "9+" : unreadNotificationsCount}
                     </Text>
                   </View>
                 )}
@@ -543,6 +561,7 @@ export default function HRDashboard() {
         </Animated.View>
       </ScrollView>
     </View>
+    </LayoutAnimationConfig>
   );
 }
 

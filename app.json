@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.vyapaarseva.app",
-      "buildNumber": "14",
+      "buildNumber": "15",
       "infoPlist": {
         "NSFaceIDUsageDescription": "Vyapaar Sewa uses Face ID to secure your app and protect your data.",
         "NSLocationWhenInUseUsageDescription": "Vyapaar Sewa uses your location to verify you are connected to your office WiFi network when marking attendance.",
@@ -119,9 +119,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "bc21ae6e-ee3f-4fa9-b520-73920da2e993"
+        "projectId": "6bb7c861-dc98-4687-b338-9bde6be6c04c"
       }
     },
-    "owner": "viperinstitute1"
+    "owner": "ankit_12345"
   }
 }

@@ -25,7 +25,6 @@ import {
   Platform,
   Pressable,
 } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
 import { Text } from "@/components/ui/Text";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -312,7 +311,7 @@ export default function HRAttendanceScreen() {
         }
       >
         {/* Header Section */}
-        <Animated.View entering={FadeInDown.delay(50).springify()} style={styles.headerSection}>
+        <View style={styles.headerSection}>
           {/* Date Navigation Row */}
           <View style={styles.dateRow}>
             <TouchableOpacity
@@ -479,10 +478,10 @@ export default function HRAttendanceScreen() {
               </>
             )}
           </View>
-        </Animated.View>
+        </View>
 
         {/* Search Bar */}
-        <Animated.View entering={FadeInDown.delay(150).springify()} style={styles.searchContainer}>
+        <View style={styles.searchContainer}>
           <View style={styles.searchBar}>
             <Ionicons name="search" size={16} color={Colors.textTertiary} />
             <TextInput
@@ -518,20 +517,20 @@ export default function HRAttendanceScreen() {
               <Ionicons name="close" size={14} color={Colors.primary} />
             </TouchableOpacity>
           )}
-        </Animated.View>
+        </View>
 
 
         {/* Table Header */}
-        <Animated.View entering={FadeInDown.delay(200).springify()}>
+        <View>
           <AttendanceTableHeader
           sortField={sortField}
           sortOrder={sortOrder}
           onSort={handleSort}
         />
-        </Animated.View>
+        </View>
 
         {/* Table Content */}
-        <Animated.View entering={FadeInDown.delay(250).springify()} style={[styles.tableContainer, { minHeight: 300, paddingBottom: 20 }]}>
+        <View style={[styles.tableContainer, { minHeight: 300, paddingBottom: 20 }]}>
           {isLoadingData ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#6366F1" />
@@ -559,7 +558,7 @@ export default function HRAttendanceScreen() {
               </Text>
             </View>
           )}
-        </Animated.View>
+        </View>
       </ScrollView>
 
       <MarkAttendanceModal
