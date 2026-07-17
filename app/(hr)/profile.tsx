@@ -180,23 +180,36 @@ export default function HRProfileScreen() {
   };
 
   const handleSignOutAllDevices = () => {
-    confirmDestructive(
-      "Sign Out Everywhere",
-      "This will sign you out from all devices including this one. You will need to sign in again. Are you sure?",
-      () => {
-        signOutAllDevicesMutation.mutate(undefined, {
-          onSuccess: () => {
-            success("Success", "Signed out from all devices");
-            setShowDevicesModal(false);
-          },
-          onError: (err) => {
-            error("Error", err.message || "Failed to sign out");
-          },
-        });
-      },
-      undefined,
-      "Sign Out"
-    );
+    // iOS only allows one native <Modal> to be presented at a time.
+    // The confirm dialog (AlertModal) won't show while the Devices modal is
+    // still open, so close it first and present the confirm after the dismiss
+    // animation. Android handles nested modals fine, so no delay is needed there.
+    setShowDevicesModal(false);
+
+    const showConfirm = () => {
+      confirmDestructive(
+        "Sign Out Everywhere",
+        "This will sign you out from all devices including this one. You will need to sign in again. Are you sure?",
+        () => {
+          signOutAllDevicesMutation.mutate(undefined, {
+            onSuccess: () => {
+              success("Success", "Signed out from all devices");
+            },
+            onError: (err) => {
+              error("Error", err.message || "Failed to sign out");
+            },
+          });
+        },
+        undefined,
+        "Sign Out"
+      );
+    };
+
+    if (Platform.OS === "ios") {
+      setTimeout(showConfirm, 350);
+    } else {
+      showConfirm();
+    }
   };
 
   const handleEnablePushNotifications = async () => {
