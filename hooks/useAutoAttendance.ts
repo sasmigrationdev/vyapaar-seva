@@ -225,7 +225,8 @@ export function useAutoAttendance({
       const shouldCheckin = !todayAttendance && !hasCheckedInToday.current;
 
       if (shouldCheckin) {
-        // Clear any pending checkout timer since we're now connecting
+        // Clear any pending 
+        // r since we're now connecting
         if (debounceTimer.current && pendingAction.current === 'checkout') {
           clearTimeout(debounceTimer.current);
           debounceTimer.current = null;
