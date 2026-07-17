@@ -22,6 +22,7 @@ import {
   hasHardwareAsync,
   isEnrolledAsync,
   getBiometricType,
+  hasDeviceLock,
   authenticate as authenticateService,
   loadSettings,
   saveSettings,
@@ -56,6 +57,10 @@ export function LocalAuthProvider({
   const appState = useRef(AppState.currentState);
   const hasInitialized = useRef(false);
   const prevIsAuthenticated = useRef(isAuthenticated);
+  // Tracks whether a biometric/PIN prompt is currently on screen. The prompt
+  // pushes the app into `inactive`/`background`, and we must NOT re-lock while
+  // it is up, otherwise unlocking loops forever.
+  const isAuthenticatingRef = useRef(false);
 
   // Initialize local auth state
   const initialize = useCallback(async () => {
@@ -63,12 +68,14 @@ export function LocalAuthProvider({
     hasInitialized.current = true;
 
     try {
-      const [hasHardware, isEnrolled, biometricType, settings] = await Promise.all([
-        hasHardwareAsync(),
-        isEnrolledAsync(),
-        getBiometricType(),
-        loadSettings(),
-      ]);
+      const [hasHardware, isEnrolled, biometricType, settings, deviceLock] =
+        await Promise.all([
+          hasHardwareAsync(),
+          isEnrolledAsync(),
+          getBiometricType(),
+          loadSettings(),
+          hasDeviceLock(),
+        ]);
 
       setState((prev) => ({
         ...prev,
@@ -76,8 +83,9 @@ export function LocalAuthProvider({
         isBiometricEnrolled: isEnrolled,
         biometricType,
         isEnabled: settings.enabled,
-        // Lock the app if auth is enabled and user is authenticated
-        isLocked: settings.enabled && isAuthenticated,
+        // Lock only if enabled, authenticated, AND the device still has a
+        // secure lock to unlock with. Without one the user would be stranded.
+        isLocked: settings.enabled && isAuthenticated && deviceLock,
       }));
     } catch (error) {
       console.error('Failed to initialize local auth:', error);
@@ -92,17 +100,33 @@ export function LocalAuthProvider({
   // Handle app state changes (background/foreground)
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      // App came to foreground from background
-      if (
-        appState.current.match(/inactive|background/) &&
-        nextAppState === 'active'
-      ) {
-        // Lock if enabled and authenticated
-        if (state.isEnabled && isAuthenticated) {
-          setState((prev) => ({ ...prev, isLocked: true, authError: null }));
-        }
-      }
+      const prevAppState = appState.current;
       appState.current = nextAppState;
+
+      // Only re-lock when returning from a TRUE background. We deliberately
+      // ignore the transient `inactive` state: iOS enters `inactive` while the
+      // biometric prompt is on screen, so treating it as a foreground event
+      // would re-lock the app the instant the user unlocks it -> infinite loop.
+      if (prevAppState !== 'background' || nextAppState !== 'active') {
+        return;
+      }
+
+      // A prompt is still up (e.g. the app briefly backgrounded during auth) —
+      // never re-lock mid-authentication.
+      if (isAuthenticatingRef.current) return;
+
+      if (state.isEnabled && isAuthenticated) {
+        // Re-check the device lock: the user may have removed their phone's
+        // screen lock while the app was backgrounded. If there's no secure
+        // lock left, don't engage the app lock (they couldn't unlock it).
+        hasDeviceLock().then((deviceLock) => {
+          setState((prev) => ({
+            ...prev,
+            isLocked: deviceLock,
+            authError: null,
+          }));
+        });
+      }
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
@@ -125,16 +149,38 @@ export function LocalAuthProvider({
   useEffect(() => {
     // User just became authenticated (session was restored)
     if (!prevIsAuthenticated.current && isAuthenticated && state.isEnabled) {
-      setState((prev) => ({ ...prev, isLocked: true, authError: null }));
+      // Only lock if the device actually has a secure lock to unlock with.
+      hasDeviceLock().then((deviceLock) => {
+        if (deviceLock) {
+          setState((prev) => ({ ...prev, isLocked: true, authError: null }));
+        }
+      });
     }
     prevIsAuthenticated.current = isAuthenticated;
   }, [isAuthenticated, state.isEnabled]);
 
   // Authenticate user
   const authenticate = useCallback(async (): Promise<boolean> => {
+    // Guard against re-entrancy: the lock screen auto-triggers this on mount
+    // and also on button press, which could fire two overlapping prompts.
+    if (isAuthenticatingRef.current) return false;
+    isAuthenticatingRef.current = true;
     setState((prev) => ({ ...prev, isAuthenticating: true, authError: null }));
 
     try {
+      // If the device no longer has a secure lock (screen lock removed), there
+      // is nothing to authenticate against — just unlock rather than trap the
+      // user on the lock screen forever.
+      if (!(await hasDeviceLock())) {
+        setState((prev) => ({
+          ...prev,
+          isLocked: false,
+          isAuthenticating: false,
+          authError: null,
+        }));
+        return true;
+      }
+
       // Use device fallback (PIN/pattern) if biometrics fail
       const result = await authenticateService(false);
 
@@ -161,6 +207,8 @@ export function LocalAuthProvider({
         authError: 'Authentication failed',
       }));
       return false;
+    } finally {
+      isAuthenticatingRef.current = false;
     }
   }, []);
 

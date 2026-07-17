@@ -56,6 +56,21 @@ export const getEnrolledLevelAsync = async (): Promise<LocalAuthentication.Secur
 };
 
 /**
+ * Whether the device currently has a usable secure lock enrolled
+ * (biometric OR device PIN/pattern/password). If this is false the app
+ * lock must NOT engage, otherwise the user would be permanently locked
+ * out with no credential to unlock with.
+ */
+export const hasDeviceLock = async (): Promise<boolean> => {
+  try {
+    const level = await LocalAuthentication.getEnrolledLevelAsync();
+    return level !== LocalAuthentication.SecurityLevel.NONE;
+  } catch {
+    return false;
+  }
+};
+
+/**
  * Get available biometric types
  */
 export const getBiometricType = async (): Promise<BiometricType> => {
